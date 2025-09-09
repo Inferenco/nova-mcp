@@ -70,7 +70,7 @@ impl NovaServer {
             },
             Tool {
                 name: "get_btc_price".to_string(),
-                description: "Fetch current BTC price in USD (Coindesk)".to_string(),
+                description: "Fetch current BTC price in USD (CoinGecko)".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {}

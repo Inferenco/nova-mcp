@@ -6,7 +6,7 @@ Nova-MCP is a minimal Model Context Protocol (MCP) server designed to work with 
 
 ### ✅ Example Tools (No API Keys)
 - get_cat_fact: Fetch a random cat fact from catfact.ninja
-- get_btc_price: Fetch current BTC price in USD from Coindesk
+- get_btc_price: Fetch current BTC price in USD from CoinGecko
 
 ## Quick Start
 

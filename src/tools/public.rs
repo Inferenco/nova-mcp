@@ -26,21 +26,34 @@ impl PublicTools {
     }
 
     pub async fn get_btc_price(&self, _input: GetBtcPriceInput) -> Result<GetBtcPriceOutput> {
-        let resp: CoindeskApi = self
+        let resp: CoingeckoApi = self
             .http
-            .get("https://api.coindesk.com/v1/bpi/currentprice.json")
+            .get("https://api.coingecko.com/api/v3/coins/bitcoin")
+            .query(&[
+                ("localization", "false"),
+                ("tickers", "false"),
+                ("market_data", "true"),
+                ("community_data", "false"),
+                ("developer_data", "false"),
+                ("sparkline", "false"),
+            ])
             .send()
             .await?
             .error_for_status()?
             .json()
             .await?;
 
-        let price = resp.bpi.get("USD").map(|usd| usd.rate_float).unwrap_or(0.0);
+        let price = resp
+            .market_data
+            .current_price
+            .get("usd")
+            .copied()
+            .unwrap_or(0.0);
 
         Ok(GetBtcPriceOutput {
             usd_price: price,
-            updated_at: resp.time.updated_iso,
-            source: "coindesk".to_string(),
+            updated_at: resp.last_updated,
+            source: "coingecko".to_string(),
         })
     }
 }
@@ -83,24 +96,14 @@ struct CatFactApi {
 }
 
 #[derive(Debug, Deserialize)]
-struct CoindeskApi {
-    time: CoindeskTime,
-    bpi: std::collections::HashMap<String, CoindeskBpi>,
+struct CoingeckoApi {
+    market_data: CoingeckoMarketData,
+    last_updated: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Deserialize)]
-struct CoindeskTime {
-    #[serde(rename = "updatedISO")]
-    updated_iso: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CoindeskBpi {
-    #[allow(dead_code)]
-    code: String,
-    #[allow(dead_code)]
-    rate: String,
-    rate_float: f64,
+struct CoingeckoMarketData {
+    current_price: std::collections::HashMap<String, f64>,
 }
 
 #[cfg(test)]
@@ -108,18 +111,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_coindesk_sample() {
+    fn parse_coingecko_sample() {
         let sample = r#"{
-            "time": { "updatedISO": "2024-01-01T00:00:00Z" },
-            "bpi": {
-              "USD": { "code": "USD", "rate": "100,000.0000", "rate_float": 100000.0 }
+            "last_updated": "2024-01-01T00:00:00Z",
+            "market_data": {
+              "current_price": { "usd": 100000.0 }
             }
         }"#;
-        let parsed: CoindeskApi = serde_json::from_str(sample).unwrap();
+        let parsed: CoingeckoApi = serde_json::from_str(sample).unwrap();
         assert_eq!(
-            parsed.time.updated_iso.to_rfc3339(),
+            parsed.last_updated.to_rfc3339(),
             "2024-01-01T00:00:00+00:00"
         );
-        assert_eq!(parsed.bpi.get("USD").unwrap().rate_float, 100000.0);
+        assert_eq!(
+            *parsed.market_data.current_price.get("usd").unwrap(),
+            100000.0
+        );
     }
 }
