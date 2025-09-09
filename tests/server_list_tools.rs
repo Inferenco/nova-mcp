@@ -9,4 +9,3 @@ fn list_tools_has_only_two() {
     assert!(names.contains(&"get_cat_fact"));
     assert!(names.contains(&"get_btc_price"));
 }
-

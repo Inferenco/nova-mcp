@@ -19,7 +19,9 @@ async fn handle_rpc(
 }
 
 pub async fn run_http_server(server: NovaServer, port: u16) -> Result<()> {
-    let state = AppState { server: Arc::new(server) };
+    let state = AppState {
+        server: Arc::new(server),
+    };
 
     let app = Router::new()
         .route("/rpc", post(handle_rpc))
@@ -31,4 +33,3 @@ pub async fn run_http_server(server: NovaServer, port: u16) -> Result<()> {
     axum::serve(listener, app).await?;
     Ok(())
 }
-

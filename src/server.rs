@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
 use crate::config::NovaConfig;
-use crate::tools::public::{PublicTools, GetCatFactInput, GetBtcPriceInput};
 use crate::error::{NovaError, Result};
+use crate::tools::public::{GetBtcPriceInput, GetCatFactInput, PublicTools};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tool {
@@ -47,16 +47,15 @@ pub struct McpError {
 }
 
 pub struct NovaServer {
-    config: NovaConfig,
     public_tools: PublicTools,
 }
 
 impl NovaServer {
-    pub fn new(config: NovaConfig) -> Self {
+    pub fn new(_config: NovaConfig) -> Self {
         let public_tools = PublicTools::new();
-        Self { config, public_tools }
+        Self { public_tools }
     }
-    
+
     pub fn get_tools(&self) -> Vec<Tool> {
         vec![
             Tool {
@@ -79,10 +78,10 @@ impl NovaServer {
             },
         ]
     }
-    
+
     pub async fn handle_tool_call(&self, tool_call: ToolCall) -> Result<ToolResult> {
         tracing::info!("Handling tool call: {}", tool_call.name);
-        
+
         let result = match tool_call.name.as_str() {
             "get_cat_fact" => {
                 let input: GetCatFactInput = serde_json::from_value(tool_call.arguments)?;
@@ -90,21 +89,25 @@ impl NovaServer {
                 serde_json::to_value(output)?
             }
             "get_btc_price" => {
-                let _input: GetBtcPriceInput = serde_json::from_value(tool_call.arguments).unwrap_or(GetBtcPriceInput{});
-                let output = self.public_tools.get_btc_price(GetBtcPriceInput{}).await?;
+                let _input: GetBtcPriceInput =
+                    serde_json::from_value(tool_call.arguments).unwrap_or(GetBtcPriceInput {});
+                let output = self.public_tools.get_btc_price(GetBtcPriceInput {}).await?;
                 serde_json::to_value(output)?
             }
             _ => {
-                return Err(NovaError::api_error(format!("Unknown tool: {}", tool_call.name)));
+                return Err(NovaError::api_error(format!(
+                    "Unknown tool: {}",
+                    tool_call.name
+                )));
             }
         };
-        
+
         Ok(ToolResult {
             content: serde_json::to_string_pretty(&result)?,
             is_error: false,
         })
     }
-    
+
     pub async fn handle_request(&self, request: McpRequest) -> McpResponse {
         match request.method.as_str() {
             "tools/list" => {
@@ -145,7 +148,7 @@ impl NovaServer {
                                     message: format!("Tool execution failed: {}", e),
                                     data: None,
                                 }),
-                            }
+                            },
                         }
                     } else {
                         McpResponse {
@@ -172,43 +175,37 @@ impl NovaServer {
                     }
                 }
             }
-            "initialize" => {
-                McpResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: Some(json!({
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {
-                            "tools": {}
-                        },
-                        "serverInfo": {
-                            "name": "nova-mcp",
-                            "version": "0.1.0"
-                        }
-                    })),
-                    error: None,
-                }
-            }
-            "ping" => {
-                McpResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: Some(json!({ "ok": true })),
-                    error: None,
-                }
-            }
-            _ => {
-                McpResponse {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: None,
-                    error: Some(McpError {
-                        code: -32601,
-                        message: format!("Method not found: {}", request.method),
-                        data: None,
-                    }),
-                }
-            }
+            "initialize" => McpResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: Some(json!({
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {}
+                    },
+                    "serverInfo": {
+                        "name": "nova-mcp",
+                        "version": "0.1.0"
+                    }
+                })),
+                error: None,
+            },
+            "ping" => McpResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: Some(json!({ "ok": true })),
+                error: None,
+            },
+            _ => McpResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: None,
+                error: Some(McpError {
+                    code: -32601,
+                    message: format!("Method not found: {}", request.method),
+                    data: None,
+                }),
+            },
         }
     }
 }

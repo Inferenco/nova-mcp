@@ -1,9 +1,9 @@
-pub mod error;
-pub mod tools;
 pub mod config;
-pub mod server;
+pub mod error;
 pub mod http;
+pub mod server;
+pub mod tools;
 
+pub use config::NovaConfig;
 pub use error::{NovaError, Result};
 pub use server::NovaServer;
-pub use config::NovaConfig;

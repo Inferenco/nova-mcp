@@ -18,8 +18,11 @@ async fn main() -> Result<()> {
 
     // Load configuration
     let config = NovaConfig::from_env()?;
-    tracing::info!("Configuration loaded: transport={}, port={}", 
-                  config.server.transport, config.server.port);
+    tracing::info!(
+        "Configuration loaded: transport={}, port={}",
+        config.server.transport,
+        config.server.port
+    );
 
     // Create server instance
     let server = NovaServer::new(config.clone());
@@ -31,7 +34,10 @@ async fn main() -> Result<()> {
 
     match config.server.transport.to_lowercase().as_str() {
         "http" => {
-            tracing::info!("Nova MCP Server running with HTTP transport on port {}", config.server.port);
+            tracing::info!(
+                "Nova MCP Server running with HTTP transport on port {}",
+                config.server.port
+            );
             nova_mcp::http::run_http_server(server, config.server.port).await?;
             Ok(())
         }

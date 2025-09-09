@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::error::Result;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct PublicTools {
@@ -8,7 +8,9 @@ pub struct PublicTools {
 
 impl PublicTools {
     pub fn new() -> Self {
-        Self { http: reqwest::Client::new() }
+        Self {
+            http: reqwest::Client::new(),
+        }
     }
 
     pub async fn get_cat_fact(&self, input: GetCatFactInput) -> Result<GetCatFactOutput> {
@@ -17,7 +19,10 @@ impl PublicTools {
             req = req.query(&[("max_length", max_length)]);
         }
         let resp: CatFactApi = req.send().await?.error_for_status()?.json().await?;
-        Ok(GetCatFactOutput { fact: resp.fact, length: resp.length })
+        Ok(GetCatFactOutput {
+            fact: resp.fact,
+            length: resp.length,
+        })
     }
 
     pub async fn get_btc_price(&self, _input: GetBtcPriceInput) -> Result<GetBtcPriceOutput> {
@@ -26,19 +31,15 @@ impl PublicTools {
             .get("https://api.coindesk.com/v1/bpi/currentprice.json")
             .send()
             .await?
-            .error_for_status()? 
+            .error_for_status()?
             .json()
             .await?;
 
-        let price = resp
-            .bpi
-            .get("USD")
-            .map(|usd| usd.rate_float)
-            .unwrap_or(0.0);
+        let price = resp.bpi.get("USD").map(|usd| usd.rate_float).unwrap_or(0.0);
 
-        Ok(GetBtcPriceOutput { 
-            usd_price: price, 
-            updated_at: resp.time.updatedISO,
+        Ok(GetBtcPriceOutput {
+            usd_price: price,
+            updated_at: resp.time.updated_iso,
             source: "coindesk".to_string(),
         })
     }
@@ -84,7 +85,7 @@ struct CoindeskApi {
 #[derive(Debug, Deserialize)]
 struct CoindeskTime {
     #[serde(rename = "updatedISO")]
-    updatedISO: chrono::DateTime<chrono::Utc>,
+    updated_iso: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,8 +110,16 @@ mod tests {
             }
         }"#;
         let parsed: CoindeskApi = serde_json::from_str(sample).unwrap();
-        assert_eq!(parsed.time.updatedISO.to_rfc3339(), "2024-01-01T00:00:00+00:00");
+        assert_eq!(
+            parsed.time.updated_iso.to_rfc3339(),
+            "2024-01-01T00:00:00+00:00"
+        );
         assert_eq!(parsed.bpi.get("USD").unwrap().rate_float, 100000.0);
     }
 }
 
+impl Default for PublicTools {
+    fn default() -> Self {
+        Self::new()
+    }
+}

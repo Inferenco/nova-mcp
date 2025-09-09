@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::error::{NovaError, Result};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NovaConfig {
@@ -54,36 +54,36 @@ impl Default for NovaConfig {
 impl NovaConfig {
     pub fn from_env() -> Result<Self> {
         let mut config = Self::default();
-        
+
         // Override with environment variables
         if let Ok(port) = std::env::var("NOVA_MCP_PORT") {
-            config.server.port = port.parse()
+            config.server.port = port
+                .parse()
                 .map_err(|_| NovaError::config_error("Invalid NOVA_MCP_PORT"))?;
         }
-        
+
         if let Ok(log_level) = std::env::var("NOVA_MCP_LOG_LEVEL") {
             config.server.log_level = log_level;
         }
-        
+
         if let Ok(transport) = std::env::var("NOVA_MCP_TRANSPORT") {
             config.server.transport = transport;
         }
-        
+
         config.apis.uniswap_api_key = std::env::var("UNISWAP_API_KEY").ok();
         config.apis.coingecko_api_key = std::env::var("COINGECKO_API_KEY").ok();
         config.apis.dexscreener_api_key = std::env::var("DEXSCREENER_API_KEY").ok();
-        
+
         Ok(config)
     }
-    
+
     pub fn from_file(path: &str) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| NovaError::config_error(format!("Failed to read config file: {}", e)))?;
-        
+
         let config: NovaConfig = toml::from_str(&content)
             .map_err(|e| NovaError::config_error(format!("Failed to parse config file: {}", e)))?;
-        
+
         Ok(config)
     }
 }
-
