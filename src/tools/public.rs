@@ -45,6 +45,12 @@ impl PublicTools {
     }
 }
 
+impl Default for PublicTools {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Inputs/Outputs
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -115,11 +121,5 @@ mod tests {
             "2024-01-01T00:00:00+00:00"
         );
         assert_eq!(parsed.bpi.get("USD").unwrap().rate_float, 100000.0);
-    }
-}
-
-impl Default for PublicTools {
-    fn default() -> Self {
-        Self::new()
     }
 }
