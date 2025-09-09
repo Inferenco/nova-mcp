@@ -1,0 +1,23 @@
+# Build
+target/
+
+# IDE/editor
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Env
+.env
+.env.*
+
+# Misc
+coverage/
+*.swp
+*.swo
+

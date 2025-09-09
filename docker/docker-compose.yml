@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  nova-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: nova-mcp-server
+    environment:
+      - NOVA_MCP_LOG_LEVEL=info
+      - NOVA_MCP_TRANSPORT=http
+      - NOVA_MCP_PORT=8080
+      # Add API keys as needed
+      # - UNISWAP_API_KEY=${UNISWAP_API_KEY}
+      # - COINGECKO_API_KEY=${COINGECKO_API_KEY}
+      # - DEXSCREENER_API_KEY=${DEXSCREENER_API_KEY}
+    ports:
+      - "8080:8080"
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-lc", 'curl -s -X POST http://localhost:8080/rpc -H "Content-Type: application/json" -d "{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"tools/list\\\"}" | grep -q get_cat_fact']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

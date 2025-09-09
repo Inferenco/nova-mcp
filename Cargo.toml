@@ -1,0 +1,50 @@
+[package]
+name = "nova-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Nova MCP Server - DEX tools for Model Context Protocol"
+authors = ["Nova Team"]
+license = "MIT"
+repository = "https://github.com/your-org/nova-mcp"
+
+[[bin]]
+name = "nova-mcp-stdio"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client for API calls
+reqwest = { version = "0.11", features = ["json"] }
+
+# HTTP server for JSON-RPC (optional HTTP transport)
+axum = { version = "0.7" }
+hyper = { version = "1" }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Configuration
+toml = "0.8"
+
+# Utilities (none)
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = ["stdio"]
+stdio = []
