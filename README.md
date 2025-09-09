@@ -39,6 +39,46 @@ export NOVA_MCP_PORT=8080
 cargo run --bin nova-mcp-stdio
 ```
 
+### Docker
+
+Build the image and run the server over HTTP on port 8080.
+
+1) Docker CLI
+```bash
+# From repo root
+docker build -t nova-mcp -f docker/Dockerfile .
+
+# Run with HTTP JSON-RPC on port 8080
+docker run --rm -it \
+  -p 8080:8080 \
+  -e NOVA_MCP_TRANSPORT=http \
+  -e NOVA_MCP_PORT=8080 \
+  --name nova-mcp \
+  nova-mcp
+
+# Verify
+curl -s -X POST http://localhost:8080/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+2) Docker Compose
+```bash
+# From repo root
+docker compose -f docker/docker-compose.yml up --build -d
+
+# Check logs
+docker logs -f nova-mcp-server
+
+# Verify
+curl -s -X POST http://localhost:8080/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Stop
+docker compose -f docker/docker-compose.yml down
+```
+
 ### Configuration
 
 Nova-MCP can be configured via environment variables:

@@ -20,7 +20,8 @@ services:
     tty: true
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "bash", "-lc", 'curl -s -X POST http://localhost:8080/rpc -H "Content-Type: application/json" -d "{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"tools/list\\\"}" | grep -q get_cat_fact']
+      # Check that the HTTP endpoint responds (no bash/grep required)
+      test: ["CMD", "sh", "-c", "curl -fsS -m 5 -X POST http://localhost:8080/rpc -H 'Content-Type: application/json' -d '{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"tools/list\\\"}' > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3

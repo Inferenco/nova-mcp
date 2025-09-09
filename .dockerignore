@@ -1,0 +1,22 @@
+# Speed up Docker builds and keep images lean
+target/
+**/target/
+.git/
+.github/
+.gitignore
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+node_modules/
+tests/
+docs/
+examples/
+scripts/
+
+# Keep core build inputs
+!Cargo.toml
+!Cargo.lock
+!src/**
+!docker/**

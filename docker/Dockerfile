@@ -1,5 +1,5 @@
 # Nova-MCP Server Dockerfile
-FROM rust:1.89-slim as builder
+FROM rust:1.89-slim AS builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -51,6 +51,7 @@ EXPOSE 8080
 # Set environment variables
 ENV NOVA_MCP_LOG_LEVEL=info
 ENV NOVA_MCP_TRANSPORT=http
+ENV NOVA_MCP_PORT=8080
 
 # Run the server
 CMD ["./nova-mcp-stdio"]
