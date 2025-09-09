@@ -227,6 +227,21 @@ cargo test -- --ignored
 RUST_LOG=debug cargo run
 ```
 
+## Docker Commands
+
+- Build image:
+  - `docker build -t nova-mcp -f docker/Dockerfile .`
+- Run with Compose (build + start in background):
+  - `docker compose -f docker/docker-compose.yml up --build -d`
+- View logs:
+  - `docker compose -f docker/docker-compose.yml logs -f`
+- Check service status:
+  - `docker compose -f docker/docker-compose.yml ps`
+- Stop and remove containers:
+  - `docker compose -f docker/docker-compose.yml down`
+- Stop and remove containers, networks, and volumes:
+  - `docker compose -f docker/docker-compose.yml down -v`
+
 ### Adding New Tools
 
 1. Create a new function in `src/tools/public.rs` (or a new module)
