@@ -36,6 +36,9 @@ cargo run --bin nova-mcp-stdio
 ```bash
 export NOVA_MCP_TRANSPORT=http
 export NOVA_MCP_PORT=8080
+# Optional: enable API key auth for HTTP
+export NOVA_MCP_AUTH_ENABLED=true
+export NOVA_MCP_API_KEYS=devkey123
 cargo run --bin nova-mcp-stdio
 ```
 
@@ -59,6 +62,7 @@ docker run --rm -it \
 # Verify
 curl -s -X POST http://localhost:8080/rpc \
   -H 'Content-Type: application/json' \
+  -H 'x-api-key: devkey123' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
@@ -73,6 +77,7 @@ docker logs -f nova-mcp-server
 # Verify
 curl -s -X POST http://localhost:8080/rpc \
   -H 'Content-Type: application/json' \
+  -H 'x-api-key: devkey123' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # Stop
@@ -88,6 +93,9 @@ Nova-MCP can be configured via environment variables:
 export NOVA_MCP_PORT=8080
 export NOVA_MCP_LOG_LEVEL=info
 export NOVA_MCP_TRANSPORT=stdio   # or "http"
+export NOVA_MCP_AUTH_ENABLED=false # true to require x-api-key on HTTP
+export NOVA_MCP_API_KEYS="key1,key2" # allowed API keys (HTTP)
+export NOVA_MCP_AUTH_HEADER=x-api-key # override header name if needed
 
 # API keys (optional)
 export UNISWAP_API_KEY=your_uniswap_key
@@ -112,6 +120,11 @@ rate_limit_per_minute = 60
 [cache]
 ttl_seconds = 300
 max_entries = 1000
+
+[auth]
+enabled = false
+allowed_keys = []
+header_name = "x-api-key"
 ```
 
 ## Use with OpenAI Responses (MCP Tool)
@@ -182,8 +195,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 nova-mcp/
 ├── src/
 │   ├── main.rs              # Server entry point (stdio/http)
-│   ├── server.rs            # MCP server (tools/list, tools/call)
-│   ├── http.rs              # Optional HTTP JSON-RPC transport
+│   ├── server.rs            # Server core (tools registry, state)
+│   ├── mcp/
+│   │   ├── dto.rs           # MCP DTOs (requests, tools, responses)
+│   │   └── handler.rs       # MCP method handlers (list/call/initialize)
+│   ├── http.rs              # HTTP JSON-RPC transport (+auth, health)
+│   ├── auth.rs              # Simple API key auth (dev; replace for prod)
 │   ├── tools/
 │   │   └── public.rs        # get_cat_fact, get_btc_price
 │   ├── tools/               # Public tools (no-key APIs)
