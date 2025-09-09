@@ -17,3 +17,10 @@ rate_limit_per_minute = 60
 ttl_seconds = 300      # Cache time-to-live in seconds
 max_entries = 1000     # Maximum number of cached entries
 
+[auth]
+# Enable API key authentication for HTTP transport
+enabled = false
+# Comma-separated list of allowed API keys (development only; replace with a secure store in production)
+allowed_keys = []
+# Header name to read API key from
+header_name = "x-api-key"

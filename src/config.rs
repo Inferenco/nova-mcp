@@ -6,6 +6,7 @@ pub struct NovaConfig {
     pub server: ServerConfig,
     pub apis: ApiConfig,
     pub cache: CacheConfig,
+    pub auth: AuthConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +30,14 @@ pub struct CacheConfig {
     pub max_entries: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthConfig {
+    pub enabled: bool,
+    // Comma-separated API keys via env; for production replace with hashed store
+    pub allowed_keys: Vec<String>,
+    pub header_name: String,
+}
+
 impl Default for NovaConfig {
     fn default() -> Self {
         Self {
@@ -46,6 +55,11 @@ impl Default for NovaConfig {
             cache: CacheConfig {
                 ttl_seconds: 300,
                 max_entries: 1000,
+            },
+            auth: AuthConfig {
+                enabled: false,
+                allowed_keys: vec![],
+                header_name: "x-api-key".to_string(),
             },
         }
     }
@@ -73,6 +87,26 @@ impl NovaConfig {
         config.apis.uniswap_api_key = std::env::var("UNISWAP_API_KEY").ok();
         config.apis.coingecko_api_key = std::env::var("COINGECKO_API_KEY").ok();
         config.apis.dexscreener_api_key = std::env::var("DEXSCREENER_API_KEY").ok();
+
+        // Auth configuration
+        if let Ok(enabled) = std::env::var("NOVA_MCP_AUTH_ENABLED") {
+            config.auth.enabled = matches!(enabled.as_str(), "1" | "true" | "TRUE" | "yes" | "on");
+        }
+        if let Ok(keys) = std::env::var("NOVA_MCP_API_KEYS") {
+            let list = keys
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>();
+            if !list.is_empty() {
+                config.auth.allowed_keys = list;
+            }
+        }
+        if let Ok(header_name) = std::env::var("NOVA_MCP_AUTH_HEADER") {
+            if !header_name.trim().is_empty() {
+                config.auth.header_name = header_name;
+            }
+        }
 
         Ok(config)
     }
