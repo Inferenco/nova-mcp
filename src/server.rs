@@ -1,5 +1,8 @@
 use crate::config::NovaConfig;
+use crate::error::Result;
 use crate::mcp::dto::Tool;
+// Re-export MCP DTOs under `server` for backward compatibility
+pub use crate::mcp::dto::{McpError, McpRequest, McpResponse, ToolCall, ToolResult};
 use crate::tools::public::PublicTools;
 use serde_json::json;
 
@@ -41,4 +44,9 @@ impl NovaServer {
     }
 
     // handler logic is moved into crate::mcp::handler; keep server responsibilities focused
+
+    // Backward-compatible wrapper for tests/examples
+    pub async fn handle_tool_call(&self, tool_call: ToolCall) -> Result<ToolResult> {
+        crate::mcp::handler::handle_tool_call(self, tool_call).await
+    }
 }

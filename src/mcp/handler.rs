@@ -100,7 +100,7 @@ pub async fn handle_request(server: &NovaServer, request: McpRequest) -> McpResp
     }
 }
 
-async fn handle_tool_call(
+pub(crate) async fn handle_tool_call(
     server: &NovaServer,
     tool_call: ToolCall,
 ) -> Result<ToolResult, NovaError> {
