@@ -9,7 +9,10 @@ pub struct PublicTools {
 impl PublicTools {
     pub fn new() -> Self {
         Self {
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .user_agent("Nova-MCP/0.1.0")
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 
