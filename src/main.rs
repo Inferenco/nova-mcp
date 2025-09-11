@@ -1,4 +1,9 @@
 use anyhow::Result;
+use nova_mcp::http;
+use nova_mcp::mcp::{
+    dto::{McpError, McpRequest, McpResponse},
+    handler,
+};
 use nova_mcp::{NovaConfig, NovaServer};
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -43,7 +48,7 @@ async fn main() -> Result<()> {
                 "Nova MCP Server running with HTTP transport on port {}",
                 config.server.port
             );
-            nova_mcp::http::run_http_server(server, config.clone()).await?;
+            http::run_http_server(server, config.clone()).await?;
             Ok(())
         }
         _ => {
@@ -67,10 +72,9 @@ async fn main() -> Result<()> {
 
                         tracing::debug!("Received: {}", line);
 
-                        match serde_json::from_str::<nova_mcp::mcp::dto::McpRequest>(line) {
+                        match serde_json::from_str::<McpRequest>(line) {
                             Ok(request) => {
-                                let response =
-                                    nova_mcp::mcp::handler::handle_request(&server, request).await;
+                                let response = handler::handle_request(&server, request).await;
                                 let response_json = serde_json::to_string(&response)?;
 
                                 tracing::debug!("Sending: {}", response_json);
@@ -81,11 +85,11 @@ async fn main() -> Result<()> {
                             }
                             Err(e) => {
                                 tracing::error!("Failed to parse request: {}", e);
-                                let error_response = nova_mcp::mcp::dto::McpResponse {
+                                let error_response = McpResponse {
                                     jsonrpc: "2.0".to_string(),
                                     id: None,
                                     result: None,
-                                    error: Some(nova_mcp::mcp::dto::McpError {
+                                    error: Some(McpError {
                                         code: -32700,
                                         message: "Parse error".to_string(),
                                         data: Some(serde_json::json!({"details": e.to_string()})),
