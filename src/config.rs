@@ -1,7 +1,7 @@
 use crate::error::{NovaError, Result};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct NovaConfig {
     pub server: ServerConfig,
@@ -83,16 +83,7 @@ impl Default for AuthConfig {
     }
 }
 
-impl Default for NovaConfig {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            apis: ApiConfig::default(),
-            cache: CacheConfig::default(),
-            auth: AuthConfig::default(),
-        }
-    }
-}
+// Default is derivable since all fields implement Default
 
 impl NovaConfig {
     pub fn from_env() -> Result<Self> {
@@ -147,12 +138,7 @@ impl NovaConfig {
         let parsed: NovaConfig = toml::from_str(&content)
             .map_err(|e| NovaError::config_error(format!("Failed to parse config file: {}", e)))?;
 
-        let mut config = NovaConfig::default();
-        config.server = parsed.server;
-        config.apis = parsed.apis;
-        config.cache = parsed.cache;
-        config.auth = parsed.auth;
-
-        Ok(config)
+        // `serde(default)` on each struct ensures missing fields use defaults.
+        Ok(parsed)
     }
 }
