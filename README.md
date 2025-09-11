@@ -69,7 +69,7 @@ curl -s -X POST http://localhost:8080/rpc \
 2) Docker Compose
 ```bash
 # From repo root
-docker compose -f docker/docker-compose.yml up --build -d
+called nova-mcp
 
 # Check logs
 docker logs -f nova-mcp-server
