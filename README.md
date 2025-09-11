@@ -69,19 +69,39 @@ curl -s -X POST http://localhost:8080/rpc \
 2) Docker Compose
 ```bash
 # From repo root
-called nova-mcp
+# Start services (build + start in background)
+docker compose -f docker/docker-compose.yml up --build -d
 
 # Check logs
-docker logs -f nova-mcp-server
+docker compose -f docker/docker-compose.yml logs -f
 
-# Verify
+# Check service status
+docker compose -f docker/docker-compose.yml ps
+
+# Test tools with curl
+echo "Testing tools/list..."
 curl -s -X POST http://localhost:8080/rpc \
   -H 'Content-Type: application/json' \
   -H 'x-api-key: devkey123' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
-# Stop
+echo -e "\n\nTesting get_cat_fact..."
+curl -s -X POST http://localhost:8080/rpc \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: devkey123' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_cat_fact","arguments":{}}}'
+
+echo -e "\n\nTesting get_btc_price..."
+curl -s -X POST http://localhost:8080/rpc \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: devkey123' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_btc_price","arguments":{}}}'
+
+# Stop and remove containers
 docker compose -f docker/docker-compose.yml down
+
+# Stop and remove containers, networks, and volumes
+docker compose -f docker/docker-compose.yml down -v
 ```
 
 ### Configuration
