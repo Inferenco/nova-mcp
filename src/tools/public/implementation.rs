@@ -11,6 +11,7 @@ impl PublicTools {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
+            .user_agent("Nova-MCP/0.1.0")
             .build()
             .unwrap_or_else(|e| {
                 tracing::error!("Failed to build HTTP client: {}", e);
