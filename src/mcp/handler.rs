@@ -118,12 +118,11 @@ pub(crate) async fn handle_tool_call(
             serde_json::to_value(output)?
         }
         "get_btc_price" => {
-            let _input: GetBtcPriceInput =
-                serde_json::from_value(tool_call.arguments).unwrap_or(GetBtcPriceInput {});
-            let output = server
-                .public_tools()
-                .get_btc_price(GetBtcPriceInput {})
-                .await?;
+            let input: GetBtcPriceInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            let output = server.public_tools().get_btc_price(input).await?;
             serde_json::to_value(output)?
         }
         _ => {

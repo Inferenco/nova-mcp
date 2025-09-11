@@ -1,5 +1,6 @@
-use crate::error::Result;
-use serde::{Deserialize, Serialize};
+use super::dto::{GetBtcPriceInput, GetBtcPriceOutput, GetCatFactInput, GetCatFactOutput};
+use crate::error::{NovaError, Result};
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct PublicTools {
@@ -8,9 +9,14 @@ pub struct PublicTools {
 
 impl PublicTools {
     pub fn new() -> Self {
-        Self {
-            http: reqwest::Client::new(),
-        }
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::error!("Failed to build HTTP client: {}", e);
+                reqwest::Client::new()
+            });
+        Self { http }
     }
 
     pub async fn get_cat_fact(&self, input: GetCatFactInput) -> Result<GetCatFactOutput> {
@@ -18,7 +24,15 @@ impl PublicTools {
         if let Some(max_length) = input.max_length {
             req = req.query(&[("max_length", max_length)]);
         }
-        let resp: CatFactApi = req.send().await?.error_for_status()?.json().await?;
+        let resp: CatFactApi = req
+            .send()
+            .await
+            .map_err(NovaError::NetworkError)?
+            .error_for_status()
+            .map_err(NovaError::NetworkError)?
+            .json()
+            .await
+            .map_err(NovaError::NetworkError)?;
         Ok(GetCatFactOutput {
             fact: resp.fact,
             length: resp.length,
@@ -38,10 +52,13 @@ impl PublicTools {
                 ("sparkline", "false"),
             ])
             .send()
-            .await?
-            .error_for_status()?
+            .await
+            .map_err(NovaError::NetworkError)?
+            .error_for_status()
+            .map_err(NovaError::NetworkError)?
             .json()
-            .await?;
+            .await
+            .map_err(NovaError::NetworkError)?;
 
         let price = resp
             .market_data
@@ -64,44 +81,19 @@ impl Default for PublicTools {
     }
 }
 
-// Inputs/Outputs
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetCatFactInput {
-    pub max_length: Option<u32>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetCatFactOutput {
-    pub fact: String,
-    pub length: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetBtcPriceInput {}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GetBtcPriceOutput {
-    pub usd_price: f64,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-    pub source: String,
-}
-
-// API models
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct CatFactApi {
     fact: String,
     length: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct CoingeckoApi {
     market_data: CoingeckoMarketData,
     last_updated: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct CoingeckoMarketData {
     current_price: std::collections::HashMap<String, f64>,
 }

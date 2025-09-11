@@ -19,6 +19,7 @@ struct AppState {
     auth: ApiKeyAuth,
     rate: Arc<Mutex<HashMap<String, RateState>>>,
     limit_per_minute: u32,
+    ttl_seconds: u64,
 }
 
 async fn handle_rpc(
@@ -77,6 +78,7 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
         auth: crate::ApiKeyAuth::new(&config.auth),
         rate: Arc::new(Mutex::new(HashMap::new())),
         limit_per_minute: config.apis.rate_limit_per_minute,
+        ttl_seconds: config.cache.ttl_seconds,
     };
 
     let app = Router::new()
@@ -89,7 +91,9 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
     tracing::info!("Starting HTTP MCP server on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    if let Err(e) = axum::serve(listener, app).await {
+        tracing::error!("HTTP server error: {}", e);
+    }
     Ok(())
 }
 
@@ -97,6 +101,7 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
 struct RateState {
     window_start_sec: u64,
     count: u32,
+    last_seen_sec: u64,
 }
 
 async fn check_rate_limit(state: &AppState, key: &str) -> Option<StatusCode> {
@@ -106,14 +111,17 @@ async fn check_rate_limit(state: &AppState, key: &str) -> Option<StatusCode> {
         .as_secs();
     let minute_bucket = now_sec / 60;
     let mut map = state.rate.lock().await;
+    map.retain(|_, v| now_sec.saturating_sub(v.last_seen_sec) <= state.ttl_seconds);
     let entry = map.entry(key.to_string()).or_insert(RateState {
         window_start_sec: minute_bucket,
         count: 0,
+        last_seen_sec: now_sec,
     });
     if entry.window_start_sec != minute_bucket {
         entry.window_start_sec = minute_bucket;
         entry.count = 0;
     }
+    entry.last_seen_sec = now_sec;
     if entry.count >= state.limit_per_minute {
         Some(StatusCode::TOO_MANY_REQUESTS)
     } else {
