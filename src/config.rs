@@ -1,7 +1,8 @@
 use crate::error::{NovaError, Result};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct NovaConfig {
     pub server: ServerConfig,
     pub apis: ApiConfig,
@@ -10,13 +11,25 @@ pub struct NovaConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ServerConfig {
     pub port: u16,
     pub log_level: String,
     pub transport: String, // "stdio", "sse", "http"
 }
 
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            port: 8080,
+            log_level: "info".to_string(),
+            transport: "stdio".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ApiConfig {
     pub uniswap_api_key: Option<String>,
     pub coingecko_api_key: Option<String>,
@@ -24,13 +37,35 @@ pub struct ApiConfig {
     pub rate_limit_per_minute: u32,
 }
 
+impl Default for ApiConfig {
+    fn default() -> Self {
+        Self {
+            uniswap_api_key: None,
+            coingecko_api_key: None,
+            dexscreener_api_key: None,
+            rate_limit_per_minute: 60,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CacheConfig {
     pub ttl_seconds: u64,
     pub max_entries: usize,
 }
 
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            ttl_seconds: 300,
+            max_entries: 1000,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AuthConfig {
     pub enabled: bool,
     // Comma-separated API keys via env; for production replace with hashed store
@@ -38,32 +73,17 @@ pub struct AuthConfig {
     pub header_name: String,
 }
 
-impl Default for NovaConfig {
+impl Default for AuthConfig {
     fn default() -> Self {
         Self {
-            server: ServerConfig {
-                port: 8080,
-                log_level: "info".to_string(),
-                transport: "stdio".to_string(),
-            },
-            apis: ApiConfig {
-                uniswap_api_key: None,
-                coingecko_api_key: None,
-                dexscreener_api_key: None,
-                rate_limit_per_minute: 60,
-            },
-            cache: CacheConfig {
-                ttl_seconds: 300,
-                max_entries: 1000,
-            },
-            auth: AuthConfig {
-                enabled: false,
-                allowed_keys: vec![],
-                header_name: "x-api-key".to_string(),
-            },
+            enabled: false,
+            allowed_keys: vec![],
+            header_name: "x-api-key".to_string(),
         }
     }
 }
+
+// Default is derivable since all fields implement Default
 
 impl NovaConfig {
     pub fn from_env() -> Result<Self> {
@@ -115,9 +135,10 @@ impl NovaConfig {
         let content = std::fs::read_to_string(path)
             .map_err(|e| NovaError::config_error(format!("Failed to read config file: {}", e)))?;
 
-        let config: NovaConfig = toml::from_str(&content)
+        let parsed: NovaConfig = toml::from_str(&content)
             .map_err(|e| NovaError::config_error(format!("Failed to parse config file: {}", e)))?;
 
-        Ok(config)
+        // `serde(default)` on each struct ensures missing fields use defaults.
+        Ok(parsed)
     }
 }
