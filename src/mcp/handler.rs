@@ -1,6 +1,10 @@
 use crate::server::NovaServer;
 use crate::{
     error::NovaError,
+    tools::gecko_terminal::{
+        get_networks, get_pool, get_token, GetGeckoNetworksInput, GetGeckoPoolInput,
+        GetGeckoTokenInput,
+    },
     tools::public::{GetBtcPriceInput, GetCatFactInput},
 };
 use serde_json::json;
@@ -123,6 +127,36 @@ pub(crate) async fn handle_tool_call(
                 Err(_) => return Err(NovaError::api_error("Invalid arguments")),
             };
             let output = server.public_tools().get_btc_price(input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_gecko_networks" => {
+            let input: GetGeckoNetworksInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            let output = get_networks(server.gecko_terminal_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_gecko_token" => {
+            let input: GetGeckoTokenInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.network.trim().is_empty() || input.address.trim().is_empty() {
+                return Err(NovaError::api_error("network and address are required"));
+            }
+            let output = get_token(server.gecko_terminal_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_gecko_pool" => {
+            let input: GetGeckoPoolInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.network.trim().is_empty() || input.address.trim().is_empty() {
+                return Err(NovaError::api_error("network and address are required"));
+            }
+            let output = get_pool(server.gecko_terminal_tools(), input).await?;
             serde_json::to_value(output)?
         }
         _ => {
