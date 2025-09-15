@@ -1,6 +1,7 @@
 use crate::config::NovaConfig;
 use crate::error::Result;
 use crate::mcp::dto::Tool;
+use crate::plugins::PluginManager;
 // Re-export MCP DTOs under `server` for backward compatibility
 pub use crate::mcp::dto::{McpError, McpRequest, McpResponse, ToolCall, ToolResult};
 use crate::tools::gecko_terminal::GeckoTerminalTools;
@@ -8,16 +9,18 @@ use crate::tools::new_pools::NewPoolsTools;
 use crate::tools::search_pools::SearchPoolsTools;
 use crate::tools::trending_pools::TrendingPoolsTools;
 use serde_json::json;
+use std::sync::Arc;
 
 pub struct NovaServer {
     gecko_terminal_tools: GeckoTerminalTools,
     trending_pools_tools: TrendingPoolsTools,
     search_pools_tools: SearchPoolsTools,
     new_pools_tools: NewPoolsTools,
+    plugin_manager: Arc<PluginManager>,
 }
 
 impl NovaServer {
-    pub fn new(_config: NovaConfig) -> Self {
+    pub fn new(_config: NovaConfig, plugin_manager: Arc<PluginManager>) -> Self {
         let gecko_terminal_tools = GeckoTerminalTools::new();
         let trending_pools_tools = TrendingPoolsTools::new();
         let search_pools_tools = SearchPoolsTools::new();
@@ -27,6 +30,7 @@ impl NovaServer {
             trending_pools_tools,
             search_pools_tools,
             new_pools_tools,
+            plugin_manager,
         }
     }
 
@@ -136,6 +140,14 @@ impl NovaServer {
         });
 
         tools
+    }
+
+    pub fn plugin_manager(&self) -> &PluginManager {
+        self.plugin_manager.as_ref()
+    }
+
+    pub fn plugin_manager_arc(&self) -> Arc<PluginManager> {
+        Arc::clone(&self.plugin_manager)
     }
 
     // handler logic is moved into crate::mcp::handler; keep server responsibilities focused

@@ -1,10 +1,12 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use nova_mcp::http;
 use nova_mcp::mcp::{
     dto::{McpError, McpRequest, McpResponse},
     handler,
 };
+use nova_mcp::plugins::PluginManager;
 use nova_mcp::{NovaConfig, NovaServer};
+use std::sync::Arc;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -34,8 +36,17 @@ async fn main() -> Result<()> {
         config.server.port
     );
 
+    let sled_db = sled::open("nova_mcp_db").context("failed to open sled database")?;
+    let user_tree = sled_db
+        .open_tree("user_plugins")
+        .context("failed to open user_plugins tree")?;
+    let group_tree = sled_db
+        .open_tree("group_plugins")
+        .context("failed to open group_plugins tree")?;
+    let plugin_manager = Arc::new(PluginManager::new(user_tree, group_tree));
+
     // Create server instance
-    let server = NovaServer::new(config.clone());
+    let server = NovaServer::new(config.clone(), Arc::clone(&plugin_manager));
 
     tracing::info!("Available tools: {}", server.get_tools().len());
     for tool in server.get_tools() {
