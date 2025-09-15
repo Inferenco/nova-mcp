@@ -182,6 +182,13 @@ Call get_btc_price:
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_btc_price","arguments":{}}}
 ```
 
+## Testing
+
+- Run unit and integration tests: `cargo test --all`
+- Run network-dependent tests (ignored by default): `cargo test -- --ignored`
+
+The ignored tests hit real public APIs and may be flaky or rate-limited; they are executed separately in CI with `continue-on-error`.
+
 ```rust
 use open_ai_rust_responses_by_sshift::{Client, Request, Model, Tool};
 use std::collections::HashMap;

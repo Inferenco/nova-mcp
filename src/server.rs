@@ -11,31 +11,27 @@ use crate::tools::trending_pools::TrendingPoolsTools;
 use serde_json::json;
 
 pub struct NovaServer {
-    public_tools: PublicTools,
     gecko_terminal_tools: GeckoTerminalTools,
     trending_pools_tools: TrendingPoolsTools,
     search_pools_tools: SearchPoolsTools,
     new_pools_tools: NewPoolsTools,
+    public_tools: PublicTools,
 }
 
 impl NovaServer {
     pub fn new(_config: NovaConfig) -> Self {
-        let public_tools = PublicTools::new();
         let gecko_terminal_tools = GeckoTerminalTools::new();
         let trending_pools_tools = TrendingPoolsTools::new();
         let search_pools_tools = SearchPoolsTools::new();
         let new_pools_tools = NewPoolsTools::new();
+        let public_tools = PublicTools::new();
         Self {
-            public_tools,
             gecko_terminal_tools,
             trending_pools_tools,
             search_pools_tools,
             new_pools_tools,
+            public_tools,
         }
-    }
-
-    pub fn public_tools(&self) -> &PublicTools {
-        &self.public_tools
     }
 
     pub fn gecko_terminal_tools(&self) -> &GeckoTerminalTools {
@@ -54,27 +50,33 @@ impl NovaServer {
         &self.new_pools_tools
     }
 
+    pub fn public_tools(&self) -> &PublicTools {
+        &self.public_tools
+    }
+
     pub fn get_tools(&self) -> Vec<Tool> {
-        let mut tools = vec![
-            Tool {
-                name: "get_cat_fact".to_string(),
-                description: "Fetch a random cat fact (catfact.ninja)".to_string(),
-                input_schema: json!({
-                    "type": "object",
-                    "properties": {
-                        "max_length": { "type": "number", "description": "Optional maximum length of fact" }
-                    }
-                }),
-            },
-            Tool {
-                name: "get_btc_price".to_string(),
-                description: "Fetch current BTC price in USD (CoinGecko)".to_string(),
-                input_schema: json!({
-                    "type": "object",
-                    "properties": {}
-                }),
-            },
-        ];
+        let mut tools = vec![];
+
+        // Public sample tools
+        tools.push(Tool {
+            name: "get_cat_fact".to_string(),
+            description: "Fetch a random cat fact (catfact.ninja)".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "max_length": { "type": "integer", "minimum": 1 }
+                }
+            }),
+        });
+
+        tools.push(Tool {
+            name: "get_btc_price".to_string(),
+            description: "Fetch current BTC price in USD (CoinGecko)".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        });
 
         tools.push(Tool {
             name: "get_gecko_networks".to_string(),

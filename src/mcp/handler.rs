@@ -114,13 +114,10 @@ pub(crate) async fn handle_tool_call(
     tracing::info!("Handling tool call: {}", tool_call.name);
     let result = match tool_call.name.as_str() {
         "get_cat_fact" => {
-            let input: GetCatFactInput = serde_json::from_value(tool_call.arguments)?;
-            // Basic input validation
-            if let Some(max_len) = input.max_length {
-                if max_len == 0 || max_len > 1000 {
-                    return Err(NovaError::api_error("max_length must be 1..=1000"));
-                }
-            }
+            let input: GetCatFactInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
             let output = server.public_tools().get_cat_fact(input).await?;
             serde_json::to_value(output)?
         }

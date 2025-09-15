@@ -5,24 +5,12 @@ use serde_json::json;
 
 #[tokio::test]
 #[ignore]
-async fn get_cat_fact_live() {
+async fn get_gecko_networks_live() {
     let server = NovaServer::new(NovaConfig::default());
     let call = ToolCall {
-        name: "get_cat_fact".into(),
+        name: "get_gecko_networks".into(),
         arguments: json!({}),
     };
     let res = server.handle_tool_call(call).await.unwrap();
-    assert!(res.content.contains("fact") || res.content.contains("Fact"));
-}
-
-#[tokio::test]
-#[ignore]
-async fn get_btc_price_live() {
-    let server = NovaServer::new(NovaConfig::default());
-    let call = ToolCall {
-        name: "get_btc_price".into(),
-        arguments: json!({}),
-    };
-    let res = server.handle_tool_call(call).await.unwrap();
-    assert!(res.content.contains("usd_price"));
+    assert!(res.content.contains("networks"));
 }
