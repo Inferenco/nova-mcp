@@ -5,7 +5,10 @@ use crate::{
         get_networks, get_pool, get_token, GetGeckoNetworksInput, GetGeckoPoolInput,
         GetGeckoTokenInput,
     },
+    tools::new_pools::{get_new_pools, GetNewPoolsInput},
     tools::public::{GetBtcPriceInput, GetCatFactInput},
+    tools::search_pools::{search_pools, SearchPoolsInput},
+    tools::trending_pools::{get_trending_pools, GetTrendingPoolsInput},
 };
 use serde_json::json;
 
@@ -157,6 +160,39 @@ pub(crate) async fn handle_tool_call(
                 return Err(NovaError::api_error("network and address are required"));
             }
             let output = get_pool(server.gecko_terminal_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_trending_pools" => {
+            let input: GetTrendingPoolsInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.network.trim().is_empty() {
+                return Err(NovaError::api_error("network is required"));
+            }
+            let output = get_trending_pools(server.trending_pools_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "search_pools" => {
+            let input: SearchPoolsInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.query.trim().is_empty() {
+                return Err(NovaError::api_error("query is required"));
+            }
+            let output = search_pools(server.search_pools_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_new_pools" => {
+            let input: GetNewPoolsInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.network.trim().is_empty() {
+                return Err(NovaError::api_error("network is required"));
+            }
+            let output = get_new_pools(server.new_pools_tools(), input).await?;
             serde_json::to_value(output)?
         }
         _ => {

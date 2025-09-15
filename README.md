@@ -7,6 +7,12 @@ Nova-MCP is a minimal Model Context Protocol (MCP) server designed to work with 
 ### ✅ Example Tools (No API Keys)
 - get_cat_fact: Fetch a random cat fact from catfact.ninja
 - get_btc_price: Fetch current BTC price in USD from CoinGecko
+- get_gecko_networks: List available networks from GeckoTerminal
+- get_gecko_token: Fetch token info from GeckoTerminal
+- get_gecko_pool: Fetch pool info from GeckoTerminal
+- get_trending_pools: Fetch trending DEX pools from GeckoTerminal
+- search_pools: Search DEX pools on GeckoTerminal
+- get_new_pools: Fetch newest DEX pools from GeckoTerminal
 
 ## Quick Start
 
@@ -121,6 +127,7 @@ export NOVA_MCP_AUTH_HEADER=x-api-key # override header name if needed
 export UNISWAP_API_KEY=your_uniswap_key
 export COINGECKO_API_KEY=your_coingecko_key
 export DEXSCREENER_API_KEY=your_dexscreener_key
+export GECKO_TERMINAL_BASE_URL=https://api.geckoterminal.com/api/v2
 ```
 
 Or create a `config.toml` file:
