@@ -10,7 +10,7 @@ async fn invalid_arguments_return_error() {
         id: Some(json!(1)),
         method: "tools/call".to_string(),
         params: Some(json!({
-            "name": "get_btc_price",
+            "name": "get_gecko_networks",
             "arguments": "nope"
         })),
     };

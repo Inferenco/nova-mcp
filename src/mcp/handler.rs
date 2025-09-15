@@ -6,7 +6,6 @@ use crate::{
         GetGeckoTokenInput,
     },
     tools::new_pools::{get_new_pools, GetNewPoolsInput},
-    tools::public::{GetBtcPriceInput, GetCatFactInput},
     tools::search_pools::{search_pools, SearchPoolsInput},
     tools::trending_pools::{get_trending_pools, GetTrendingPoolsInput},
 };
@@ -113,22 +112,6 @@ pub(crate) async fn handle_tool_call(
 ) -> Result<ToolResult, NovaError> {
     tracing::info!("Handling tool call: {}", tool_call.name);
     let result = match tool_call.name.as_str() {
-        "get_cat_fact" => {
-            let input: GetCatFactInput = match serde_json::from_value(tool_call.arguments) {
-                Ok(v) => v,
-                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
-            };
-            let output = server.public_tools().get_cat_fact(input).await?;
-            serde_json::to_value(output)?
-        }
-        "get_btc_price" => {
-            let input: GetBtcPriceInput = match serde_json::from_value(tool_call.arguments) {
-                Ok(v) => v,
-                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
-            };
-            let output = server.public_tools().get_btc_price(input).await?;
-            serde_json::to_value(output)?
-        }
         "get_gecko_networks" => {
             let input: GetGeckoNetworksInput = match serde_json::from_value(tool_call.arguments) {
                 Ok(v) => v,
