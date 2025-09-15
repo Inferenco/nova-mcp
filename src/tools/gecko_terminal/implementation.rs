@@ -1,8 +1,7 @@
-use super::dto::{
-    GetGeckoNetworksInput, GetGeckoNetworksOutput, GetGeckoPoolInput, GetGeckoPoolOutput,
-    GetGeckoTokenInput, GetGeckoTokenOutput,
-};
 use super::helpers::build_url;
+use super::networks::dto::{GetGeckoNetworksInput, GetGeckoNetworksOutput};
+use super::pool::dto::{GetGeckoPoolInput, GetGeckoPoolOutput};
+use super::token::dto::{GetGeckoTokenInput, GetGeckoTokenOutput};
 use crate::error::{NovaError, Result};
 use std::time::Duration;
 

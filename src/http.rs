@@ -1,10 +1,11 @@
 use crate::mcp::dto::{McpRequest, McpResponse};
+use crate::plugins::{self, PluginManager};
 use crate::{ApiKeyAuth, NovaConfig, NovaServer};
 use anyhow::Result;
 use axum::{
     extract::DefaultBodyLimit,
     http::StatusCode,
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use std::collections::HashMap;
@@ -14,12 +15,31 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
-struct AppState {
+pub(crate) struct AppState {
     server: Arc<NovaServer>,
+    plugin_manager: Arc<PluginManager>,
     auth: ApiKeyAuth,
     rate: Arc<Mutex<HashMap<String, RateState>>>,
     limit_per_minute: u32,
     ttl_seconds: u64,
+}
+
+impl AppState {
+    pub(crate) fn server(&self) -> Arc<NovaServer> {
+        Arc::clone(&self.server)
+    }
+
+    pub(crate) fn plugin_manager(&self) -> &PluginManager {
+        self.plugin_manager.as_ref()
+    }
+
+    pub(crate) fn plugin_manager_arc(&self) -> Arc<PluginManager> {
+        Arc::clone(&self.plugin_manager)
+    }
+
+    pub(crate) fn auth(&self) -> &ApiKeyAuth {
+        &self.auth
+    }
 }
 
 async fn handle_rpc(
@@ -28,11 +48,11 @@ async fn handle_rpc(
     Json(req): Json<McpRequest>,
 ) -> Json<McpResponse> {
     // API key enforcement
-    let header_name = state.auth.header_name().to_string();
+    let header_name = state.auth().header_name().to_string();
     let presented = headers
         .get(header_name.as_str())
         .and_then(|v| v.to_str().ok());
-    if !state.auth.validate(presented) {
+    if !state.auth().validate(presented) {
         let res = McpResponse {
             jsonrpc: "2.0".to_string(),
             id: None,
@@ -60,7 +80,8 @@ async fn handle_rpc(
         };
         return Json(res);
     }
-    let res = crate::mcp::handler::handle_request(&state.server, req).await;
+    let server = state.server();
+    let res = crate::mcp::handler::handle_request(server.as_ref(), req).await;
     Json(res)
 }
 
@@ -73,8 +94,10 @@ async fn readyz() -> &'static str {
 }
 
 pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<()> {
+    let plugin_manager = server.plugin_manager_arc();
     let state = AppState {
         server: Arc::new(server),
+        plugin_manager,
         auth: crate::ApiKeyAuth::new(&config.auth),
         rate: Arc::new(Mutex::new(HashMap::new())),
         limit_per_minute: config.apis.rate_limit_per_minute,
@@ -85,6 +108,14 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
         .route("/rpc", post(handle_rpc))
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
+        .route("/plugins/register", post(plugins::register_plugin))
+        .route(
+            "/plugins/:plugin_id",
+            delete(plugins::unregister_plugin).put(plugins::update_plugin),
+        )
+        .route("/plugins", get(plugins::list_plugins))
+        .route("/plugins/:plugin_id/call", post(plugins::invoke_plugin))
+        .route("/plugins/enable", post(plugins::set_plugin_enablement))
         .layer(DefaultBodyLimit::max(1024 * 1024))
         .with_state(state);
 
@@ -104,7 +135,7 @@ struct RateState {
     last_seen_sec: u64,
 }
 
-async fn check_rate_limit(state: &AppState, key: &str) -> Option<StatusCode> {
+pub(crate) async fn check_rate_limit(state: &AppState, key: &str) -> Option<StatusCode> {
     let now_sec = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or(Duration::from_secs(0))

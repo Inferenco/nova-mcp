@@ -16,6 +16,10 @@ target/
 .env
 .env.*
 
+# Database
+docker/data/
+nova_mcp_db/
+
 # Misc
 coverage/
 *.swp

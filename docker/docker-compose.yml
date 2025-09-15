@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nova-mcp:
     build:
@@ -16,6 +14,9 @@ services:
       # - DEXSCREENER_API_KEY=${DEXSCREENER_API_KEY}
     ports:
       - "8080:8080"
+    volumes:
+      # Persist the Sled database for user/group plugin configurations
+      - ./data:/app/nova_mcp_db
     stdin_open: true
     tty: true
     restart: unless-stopped

@@ -31,6 +31,9 @@ hyper = { version = "1" }
 anyhow = "1.0"
 thiserror = "1.0"
 
+# Storage
+sled = "0.34"
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
