@@ -1,12 +1,16 @@
 # Nova-MCP: Minimal MCP Server for OpenAI Responses
 
-Nova-MCP is a minimal Model Context Protocol (MCP) server designed to work with OpenAI’s built-in MCP tool via the Responses API. It exposes exactly two example tools that call public APIs (no keys required) and returns results through MCP-compliant JSON-RPC.
+Nova-MCP is a minimal Model Context Protocol (MCP) server designed to work with OpenAI's built-in MCP tool via the Responses API. It exposes GeckoTerminal tools that call public APIs (no keys required) and returns results through MCP-compliant JSON-RPC.
 
 ## Features
 
 ### ✅ Example Tools (No API Keys)
-- get_cat_fact: Fetch a random cat fact from catfact.ninja
-- get_btc_price: Fetch current BTC price in USD from CoinGecko
+- get_gecko_networks: List available networks from GeckoTerminal
+- get_gecko_token: Fetch token info from GeckoTerminal
+- get_gecko_pool: Fetch pool info from GeckoTerminal
+- get_trending_pools: Fetch trending DEX pools from GeckoTerminal
+- search_pools: Search DEX pools on GeckoTerminal
+- get_new_pools: Fetch newest DEX pools from GeckoTerminal
 
 ## Quick Start
 
@@ -85,17 +89,11 @@ curl -s -X POST http://localhost:8080/rpc \
   -H 'x-api-key: devkey123' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
-echo -e "\n\nTesting get_cat_fact..."
+echo -e "\n\nTesting get_gecko_networks..."
 curl -s -X POST http://localhost:8080/rpc \
   -H 'Content-Type: application/json' \
   -H 'x-api-key: devkey123' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_cat_fact","arguments":{}}}'
-
-echo -e "\n\nTesting get_btc_price..."
-curl -s -X POST http://localhost:8080/rpc \
-  -H 'Content-Type: application/json' \
-  -H 'x-api-key: devkey123' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_btc_price","arguments":{}}}'
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_gecko_networks","arguments":{}}}'
 
 # Stop and remove containers
 docker compose -f docker/docker-compose.yml down
@@ -121,6 +119,7 @@ export NOVA_MCP_AUTH_HEADER=x-api-key # override header name if needed
 export UNISWAP_API_KEY=your_uniswap_key
 export COINGECKO_API_KEY=your_coingecko_key
 export DEXSCREENER_API_KEY=your_dexscreener_key
+export GECKO_TERMINAL_BASE_URL=https://api.geckoterminal.com/api/v2
 ```
 
 Or create a `config.toml` file:
@@ -165,15 +164,17 @@ List tools:
 {"jsonrpc":"2.0","id":1,"method":"tools/list"}
 ```
 
-Call get_cat_fact:
+Call get_gecko_networks:
 ```json
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_cat_fact","arguments":{}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_gecko_networks","arguments":{}}}
 ```
 
-Call get_btc_price:
-```json
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_btc_price","arguments":{}}}
-```
+## Testing
+
+- Run unit and integration tests: `cargo test --all`
+- Run network-dependent tests (ignored by default): `cargo test -- --ignored`
+
+The ignored tests hit real public APIs and may be flaky or rate-limited; they are executed separately in CI with `continue-on-error`.
 
 ```rust
 use open_ai_rust_responses_by_sshift::{Client, Request, Model, Tool};
@@ -206,8 +207,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Available Tools
 
-- get_cat_fact
-- get_btc_price
+- get_gecko_networks
+- get_gecko_token
+- get_gecko_pool
+- get_trending_pools
+- search_pools
+- get_new_pools
 
 ## Architecture
 
@@ -222,7 +227,7 @@ nova-mcp/
 │   ├── http.rs              # HTTP JSON-RPC transport (+auth, health)
 │   ├── auth.rs              # Simple API key auth (dev; replace for prod)
 │   ├── tools/
-│   │   └── public.rs        # get_cat_fact, get_btc_price
+│   │   ├── gecko_terminal.rs # GeckoTerminal API tools
 │   ├── tools/               # Public tools (no-key APIs)
 │   └── config.rs            # Configuration management
 ```

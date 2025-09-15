@@ -5,7 +5,9 @@ use crate::{
         get_networks, get_pool, get_token, GetGeckoNetworksInput, GetGeckoPoolInput,
         GetGeckoTokenInput,
     },
-    tools::public::{GetBtcPriceInput, GetCatFactInput},
+    tools::new_pools::{get_new_pools, GetNewPoolsInput},
+    tools::search_pools::{search_pools, SearchPoolsInput},
+    tools::trending_pools::{get_trending_pools, GetTrendingPoolsInput},
 };
 use serde_json::json;
 
@@ -110,25 +112,6 @@ pub(crate) async fn handle_tool_call(
 ) -> Result<ToolResult, NovaError> {
     tracing::info!("Handling tool call: {}", tool_call.name);
     let result = match tool_call.name.as_str() {
-        "get_cat_fact" => {
-            let input: GetCatFactInput = serde_json::from_value(tool_call.arguments)?;
-            // Basic input validation
-            if let Some(max_len) = input.max_length {
-                if max_len == 0 || max_len > 1000 {
-                    return Err(NovaError::api_error("max_length must be 1..=1000"));
-                }
-            }
-            let output = server.public_tools().get_cat_fact(input).await?;
-            serde_json::to_value(output)?
-        }
-        "get_btc_price" => {
-            let input: GetBtcPriceInput = match serde_json::from_value(tool_call.arguments) {
-                Ok(v) => v,
-                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
-            };
-            let output = server.public_tools().get_btc_price(input).await?;
-            serde_json::to_value(output)?
-        }
         "get_gecko_networks" => {
             let input: GetGeckoNetworksInput = match serde_json::from_value(tool_call.arguments) {
                 Ok(v) => v,
@@ -157,6 +140,39 @@ pub(crate) async fn handle_tool_call(
                 return Err(NovaError::api_error("network and address are required"));
             }
             let output = get_pool(server.gecko_terminal_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_trending_pools" => {
+            let input: GetTrendingPoolsInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.network.trim().is_empty() {
+                return Err(NovaError::api_error("network is required"));
+            }
+            let output = get_trending_pools(server.trending_pools_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "search_pools" => {
+            let input: SearchPoolsInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.query.trim().is_empty() {
+                return Err(NovaError::api_error("query is required"));
+            }
+            let output = search_pools(server.search_pools_tools(), input).await?;
+            serde_json::to_value(output)?
+        }
+        "get_new_pools" => {
+            let input: GetNewPoolsInput = match serde_json::from_value(tool_call.arguments) {
+                Ok(v) => v,
+                Err(_) => return Err(NovaError::api_error("Invalid arguments")),
+            };
+            if input.network.trim().is_empty() {
+                return Err(NovaError::api_error("network is required"));
+            }
+            let output = get_new_pools(server.new_pools_tools(), input).await?;
             serde_json::to_value(output)?
         }
         _ => {
