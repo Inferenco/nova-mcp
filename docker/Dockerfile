@@ -38,8 +38,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/target/release/nova-mcp-stdio ./nova-mcp-stdio
 
-# Change ownership
-RUN chown nova:nova nova-mcp-stdio
+# Change ownership of the entire app directory to nova user
+RUN chown -R nova:nova /app
 RUN chmod +x nova-mcp-stdio
 
 # Switch to app user

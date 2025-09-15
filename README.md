@@ -219,17 +219,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 nova-mcp/
 ├── src/
-│   ├── main.rs              # Server entry point (stdio/http)
-│   ├── server.rs            # Server core (tools registry, state)
+│   ├── main.rs               # Server entry point (stdio/http)
+│   ├── server.rs             # Server core (tools registry, state)
 │   ├── mcp/
-│   │   ├── dto.rs           # MCP DTOs (requests, tools, responses)
-│   │   └── handler.rs       # MCP method handlers (list/call/initialize)
-│   ├── http.rs              # HTTP JSON-RPC transport (+auth, health)
-│   ├── auth.rs              # Simple API key auth (dev; replace for prod)
+│   │   ├── dto.rs            # MCP DTOs (requests, tools, responses)
+│   │   └── handler.rs        # MCP method handlers (list/call/initialize)
+│   ├── http.rs               # HTTP JSON-RPC transport (+auth, health, plugins)
+│   ├── auth.rs               # API key auth (dev; replace for prod)
 │   ├── tools/
-│   │   ├── gecko_terminal.rs # GeckoTerminal API tools
-│   ├── tools/               # Public tools (no-key APIs)
-│   └── config.rs            # Configuration management
+│   │   ├── mod.rs            # Public re-exports for tools
+│   │   └── gecko_terminal/
+│   │       ├── helpers.rs
+│   │       ├── implementation.rs   # Shared HTTP client + base URL
+│   │       ├── networks/           # get_gecko_networks
+│   │       │   ├── dto.rs
+│   │       │   └── handler.rs
+│   │       ├── token/              # get_gecko_token
+│   │       │   ├── dto.rs
+│   │       │   └── handler.rs
+│   │       ├── pool/               # get_gecko_pool
+│   │       │   ├── dto.rs
+│   │       │   └── handler.rs
+│   │       ├── trending_pools/     # get_trending_pools
+│   │       │   ├── dto.rs
+│   │       │   ├── handler.rs
+│   │       │   └── implementation.rs
+│   │       ├── search_pools/       # search_pools
+│   │       │   ├── dto.rs
+│   │       │   ├── handler.rs
+│   │       │   └── implementation.rs
+│   │       └── new_pools/          # get_new_pools
+│   │           ├── dto.rs
+│   │           ├── handler.rs
+│   │           └── implementation.rs
+│   └── config.rs             # Configuration management
 ```
 
 ## Development
@@ -269,9 +292,18 @@ RUST_LOG=debug cargo run
 
 ### Adding New Tools
 
-1. Create a new function in `src/tools/public.rs` (or a new module)
-2. Describe the tool in `get_tools()` and add a match arm in `handle_tool_call`
-3. Add unit tests and update README examples
+1) Create a module under `src/tools/gecko_terminal/your_tool/` with:
+   - `dto.rs` for input/output structs
+   - `handler.rs` for the public async function used by MCP
+   - `implementation.rs` if it needs its own HTTP logic (or reuse `implementation.rs` at the parent)
+
+2) Re-export in `src/tools/gecko_terminal/mod.rs` and, if you want top-level access, in `src/tools/mod.rs`.
+
+3) Register the tool in `src/server.rs:get_tools()` with its JSON schema.
+
+4) Route the call in `src/mcp/handler.rs:handle_tool_call()` by name, deserializing the input.
+
+5) Add tests under `tests/` or a module test alongside the code.
 
 ## Contributing
 
