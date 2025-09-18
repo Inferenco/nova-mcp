@@ -15,8 +15,10 @@ async fn invalid_arguments_return_error() {
             "name": "get_gecko_networks",
             "arguments": "nope"
         })),
+        context_type: None,
+        context_id: None,
     };
-    let resp = handler::handle_request(&server, req).await;
+    let resp = handler::handle_request(&server, req, None).await;
     assert!(resp.result.is_none());
     if let Some(err) = resp.error {
         assert_eq!(err.code, -32603);

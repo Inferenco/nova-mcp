@@ -13,7 +13,7 @@ async fn get_gecko_networks_live() {
         name: "get_gecko_networks".into(),
         arguments: json!({}),
     };
-    let res = server.handle_tool_call(call).await.unwrap();
+    let res = server.handle_tool_call(call, None).await.unwrap();
     assert!(res.content.contains("networks"));
 }
 

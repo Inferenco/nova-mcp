@@ -5,7 +5,7 @@ use std::sync::Arc;
 #[test]
 fn list_tools_contains_expected() {
     let server = test_server();
-    let tools = server.get_tools();
+    let tools = server.get_tools(None);
     assert_eq!(tools.len(), 6);
     let names: Vec<_> = tools.iter().map(|t| t.name.as_str()).collect();
     assert!(names.contains(&"get_gecko_networks"));
