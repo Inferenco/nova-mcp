@@ -34,6 +34,9 @@ thiserror = "1.0"
 # Storage
 sled = "0.34"
 
+# JSON Schema validation
+jsonschema = "0.17"
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

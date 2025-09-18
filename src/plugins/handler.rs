@@ -5,11 +5,13 @@ use axum::{
     Json,
 };
 
+use crate::context::RequestContext;
 use crate::http::AppState;
 
 use super::dto::{
     ErrorResponse, PluginEnableRequest, PluginEnablementStatus, PluginInvocationRequest,
-    PluginMetadata, PluginRegistrationRequest, PluginUpdateRequest,
+    PluginMetadata, PluginRegistrationRequest, PluginUpdateRequest, ToolRegistrationResponse,
+    ToolUpdateRequest,
 };
 use super::helpers::{authorize_request, map_error};
 
@@ -84,5 +86,70 @@ pub(crate) async fn set_plugin_enablement(
     match state.plugin_manager().set_enablement(request) {
         Ok(status) => Ok(Json(status)),
         Err(err) => Err(map_error(err)),
+    }
+}
+
+pub(crate) async fn register_tool(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(mut request): Json<PluginRegistrationRequest>,
+) -> Result<(StatusCode, Json<ToolRegistrationResponse>), (StatusCode, Json<ErrorResponse>)> {
+    let (_, context) = authorize_request(&state, &headers).await?;
+    let owner_context = require_context(&context)?;
+    request.context_type = Some(owner_context.context_type.clone());
+    request.context_id = Some(owner_context.context_id.clone());
+    match state
+        .plugin_manager()
+        .register_tool(request, &owner_context)
+    {
+        Ok(response) => Ok((StatusCode::CREATED, Json(response))),
+        Err(err) => Err(map_error(err)),
+    }
+}
+
+pub(crate) async fn list_tools(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<PluginMetadata>>, (StatusCode, Json<ErrorResponse>)> {
+    let (_, context) = authorize_request(&state, &headers).await?;
+    let owner_context = require_context(&context)?;
+    match state.plugin_manager().list_plugins_for_context(
+        owner_context.context_type.clone(),
+        &owner_context.context_id,
+    ) {
+        Ok(list) => Ok(Json(list)),
+        Err(err) => Err(map_error(err)),
+    }
+}
+
+pub(crate) async fn update_tool(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(plugin_id): Path<u64>,
+    Json(request): Json<ToolUpdateRequest>,
+) -> Result<Json<PluginMetadata>, (StatusCode, Json<ErrorResponse>)> {
+    let (_, context) = authorize_request(&state, &headers).await?;
+    let owner_context = require_context(&context)?;
+    match state
+        .plugin_manager()
+        .update_tool(plugin_id, request, &owner_context)
+    {
+        Ok(metadata) => Ok(Json(metadata)),
+        Err(err) => Err(map_error(err)),
+    }
+}
+
+fn require_context(
+    context: &Option<RequestContext>,
+) -> Result<RequestContext, (StatusCode, Json<ErrorResponse>)> {
+    match context {
+        Some(ctx) => Ok(ctx.clone()),
+        None => Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Context headers are required".to_string(),
+                details: None,
+            }),
+        )),
     }
 }

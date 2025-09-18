@@ -1,3 +1,4 @@
+use crate::context::{context_key_for_rate_limit, extract_context_from_headers};
 use crate::mcp::dto::{McpRequest, McpResponse};
 use crate::plugins::{self, PluginManager};
 use crate::{ApiKeyAuth, NovaConfig, NovaServer};
@@ -5,7 +6,7 @@ use anyhow::Result;
 use axum::{
     extract::DefaultBodyLimit,
     http::StatusCode,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use std::collections::HashMap;
@@ -65,9 +66,28 @@ async fn handle_rpc(
         };
         return Json(res);
     }
-    // Simple per-key rate limiting
-    let key = presented.unwrap_or("anonymous").to_string();
-    if let Some(code) = check_rate_limit(&state, &key).await {
+    let api_key = presented.unwrap_or("anonymous").to_string();
+
+    let context = match extract_context_from_headers(&headers) {
+        Ok(ctx) => ctx,
+        Err(err) => {
+            let res = McpResponse {
+                jsonrpc: "2.0".to_string(),
+                id: None,
+                result: None,
+                error: Some(crate::mcp::dto::McpError {
+                    code: StatusCode::BAD_REQUEST.as_u16() as i32,
+                    message: err.to_string(),
+                    data: None,
+                }),
+            };
+            return Json(res);
+        }
+    };
+
+    let rate_key = context_key_for_rate_limit(context.as_ref(), &api_key);
+
+    if let Some(code) = check_rate_limit(&state, &rate_key).await {
         let res = McpResponse {
             jsonrpc: "2.0".to_string(),
             id: None,
@@ -81,7 +101,7 @@ async fn handle_rpc(
         return Json(res);
     }
     let server = state.server();
-    let res = crate::mcp::handler::handle_request(server.as_ref(), req).await;
+    let res = crate::mcp::handler::handle_request(server.as_ref(), req, context).await;
     Json(res)
 }
 
@@ -116,6 +136,9 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
         .route("/plugins", get(plugins::list_plugins))
         .route("/plugins/:plugin_id/call", post(plugins::invoke_plugin))
         .route("/plugins/enable", post(plugins::set_plugin_enablement))
+        .route("/tools/register", post(plugins::register_tool))
+        .route("/tools/:plugin_id", put(plugins::update_tool))
+        .route("/tools", get(plugins::list_tools))
         .layer(DefaultBodyLimit::max(1024 * 1024))
         .with_state(state);
 

@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
 
     let server = build_server()?;
     println!("Available tools:");
-    for t in server.get_tools() {
+    for t in server.get_tools(None) {
         println!(" - {}: {}", t.name, t.description);
     }
 
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     };
     println!(
         "gecko_networks -> {:?}",
-        server.handle_tool_call(networks).await?.content
+        server.handle_tool_call(networks, None).await?.content
     );
 
     let trending = ToolCall {
@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     };
     println!(
         "trending_pools -> {:?}",
-        server.handle_tool_call(trending).await?.content
+        server.handle_tool_call(trending, None).await?.content
     );
     Ok(())
 }

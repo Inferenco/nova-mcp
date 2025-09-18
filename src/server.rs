@@ -1,4 +1,5 @@
 use crate::config::NovaConfig;
+use crate::context::RequestContext;
 use crate::error::Result;
 use crate::mcp::dto::Tool;
 use crate::plugins::PluginManager;
@@ -50,7 +51,39 @@ impl NovaServer {
         &self.new_pools_tools
     }
 
-    pub fn get_tools(&self) -> Vec<Tool> {
+    pub fn get_tools(&self, context: Option<&RequestContext>) -> Vec<Tool> {
+        let mut tools = self.builtin_tools();
+
+        if let Some(ctx) = context {
+            match self
+                .plugin_manager
+                .list_plugins_for_context(ctx.context_type.clone(), &ctx.context_id)
+            {
+                Ok(plugins) => {
+                    for plugin in plugins {
+                        if let Some(fq_name) = plugin.fully_qualified_name.clone() {
+                            let input_schema = plugin
+                                .input_schema
+                                .clone()
+                                .unwrap_or_else(|| json!({ "type": "object" }));
+                            tools.push(Tool {
+                                name: fq_name,
+                                description: plugin.description.clone(),
+                                input_schema,
+                            });
+                        }
+                    }
+                }
+                Err(err) => {
+                    tracing::error!("Failed to list plugins for context: {}", err);
+                }
+            }
+        }
+
+        tools
+    }
+
+    fn builtin_tools(&self) -> Vec<Tool> {
         let mut tools = vec![];
 
         tools.push(Tool {
@@ -153,7 +186,11 @@ impl NovaServer {
     // handler logic is moved into crate::mcp::handler; keep server responsibilities focused
 
     // Backward-compatible wrapper for tests/examples
-    pub async fn handle_tool_call(&self, tool_call: ToolCall) -> Result<ToolResult> {
-        crate::mcp::handler::handle_tool_call(self, tool_call).await
+    pub async fn handle_tool_call(
+        &self,
+        tool_call: ToolCall,
+        context: Option<&RequestContext>,
+    ) -> Result<ToolResult> {
+        crate::mcp::handler::handle_tool_call(self, tool_call, context).await
     }
 }

@@ -3,6 +3,7 @@ use axum::{
     Json,
 };
 
+use crate::context::{context_key_for_rate_limit, extract_context_from_headers, RequestContext};
 use crate::error::NovaError;
 use crate::http::{check_rate_limit, AppState};
 
@@ -11,7 +12,7 @@ use super::dto::ErrorResponse;
 pub(crate) async fn authorize_request(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<String, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(String, Option<RequestContext>), (StatusCode, Json<ErrorResponse>)> {
     let header_name = state.auth().header_name().to_string();
     let presented = headers
         .get(header_name.as_str())
@@ -25,8 +26,21 @@ pub(crate) async fn authorize_request(
         return Err((StatusCode::UNAUTHORIZED, Json(body)));
     }
 
-    let key = presented.unwrap_or("anonymous").to_string();
-    if let Some(code) = check_rate_limit(state, &key).await {
+    let api_key = presented.unwrap_or("anonymous").to_string();
+    let context = match extract_context_from_headers(headers) {
+        Ok(context) => context,
+        Err(err) => {
+            let body = ErrorResponse {
+                error: err.to_string(),
+                details: None,
+            };
+            return Err((StatusCode::BAD_REQUEST, Json(body)));
+        }
+    };
+
+    let rate_key = context_key_for_rate_limit(context.as_ref(), &api_key);
+
+    if let Some(code) = check_rate_limit(state, &rate_key).await {
         let body = ErrorResponse {
             error: "Rate limit exceeded".to_string(),
             details: None,
@@ -34,7 +48,7 @@ pub(crate) async fn authorize_request(
         return Err((code, Json(body)));
     }
 
-    Ok(key)
+    Ok((api_key, context))
 }
 
 pub(crate) fn map_error(err: NovaError) -> (StatusCode, Json<ErrorResponse>) {

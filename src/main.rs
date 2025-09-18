@@ -48,8 +48,8 @@ async fn main() -> Result<()> {
     // Create server instance
     let server = NovaServer::new(config.clone(), Arc::clone(&plugin_manager));
 
-    tracing::info!("Available tools: {}", server.get_tools().len());
-    for tool in server.get_tools() {
+    tracing::info!("Available tools: {}", server.get_tools(None).len());
+    for tool in server.get_tools(None) {
         tracing::info!("  - {}: {}", tool.name, tool.description);
     }
 
@@ -85,7 +85,8 @@ async fn main() -> Result<()> {
 
                         match serde_json::from_str::<McpRequest>(line) {
                             Ok(request) => {
-                                let response = handler::handle_request(&server, request).await;
+                                let response =
+                                    handler::handle_request(&server, request, None).await;
                                 let response_json = serde_json::to_string(&response)?;
 
                                 tracing::debug!("Sending: {}", response_json);
