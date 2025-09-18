@@ -37,7 +37,7 @@ pub async fn handle_request(
                     format!("Failed to load tools: {}", err),
                 ),
             },
-            Err(response) => response,
+            Err(response) => *response,
         },
         "tools/call" => {
             if let Some(params) = request.params.clone() {
@@ -66,7 +66,7 @@ pub async fn handle_request(
                                 }),
                             },
                         },
-                        Err(response) => response,
+                        Err(response) => *response,
                     }
                 } else {
                     McpResponse {
@@ -224,7 +224,7 @@ pub(crate) async fn handle_tool_call(
 fn resolve_context(
     request: &McpRequest,
     transport_context: Option<RequestContext>,
-) -> Result<RequestContext, McpResponse> {
+) -> Result<RequestContext, Box<McpResponse>> {
     if let Some(context) = transport_context {
         return Ok(context);
     }
@@ -242,31 +242,31 @@ fn resolve_context(
         Some("user") => PluginContextType::User,
         Some("group") => PluginContextType::Group,
         _ => {
-            return Err(error_response(
+            return Err(Box::new(error_response(
                 request.id.clone(),
                 StatusCode::UNAUTHORIZED,
                 "Missing or invalid context_type",
-            ))
+            )))
         }
     };
 
     let context_id = match context_id {
         Some(id) if !id.is_empty() => id,
         _ => {
-            return Err(error_response(
+            return Err(Box::new(error_response(
                 request.id.clone(),
                 StatusCode::UNAUTHORIZED,
                 "Missing or invalid context_id",
-            ))
+            )))
         }
     };
 
     if context_id.parse::<i64>().is_err() {
-        return Err(error_response(
+        return Err(Box::new(error_response(
             request.id.clone(),
             StatusCode::UNAUTHORIZED,
             "context_id must be numeric",
-        ));
+        )));
     }
 
     Ok(RequestContext {

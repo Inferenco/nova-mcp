@@ -16,6 +16,10 @@ use super::dto::{
     PluginVersionRecord, RequestContext, StoredPluginRecord, UserPluginRecord,
 };
 
+type PluginStore = HashMap<u64, StoredPluginRecord>;
+type PluginIndex = HashMap<String, (u64, u32)>;
+type LoadedPluginState = (PluginStore, PluginIndex, u64);
+
 pub struct PluginManager {
     metadata_tree: sled::Tree,
     user_tree: sled::Tree,
@@ -404,10 +408,8 @@ impl PluginManager {
         if let Some(schema) = &update.input_schema {
             self.validate_schema(schema, "input_schema")?;
         }
-        if let Some(schema) = &update.output_schema {
-            if let Some(value) = schema {
-                self.validate_schema(value, "output_schema")?;
-            }
+        if let Some(Some(schema)) = &update.output_schema {
+            self.validate_schema(schema, "output_schema")?;
         }
         if let Some(endpoint) = &update.endpoint_url {
             if endpoint.trim().is_empty() {
@@ -560,15 +562,9 @@ impl PluginManager {
         }
     }
 
-    fn load_plugins(
-        tree: &sled::Tree,
-    ) -> Result<(
-        HashMap<u64, StoredPluginRecord>,
-        HashMap<String, (u64, u32)>,
-        u64,
-    )> {
-        let mut plugins = HashMap::new();
-        let mut index = HashMap::new();
+    fn load_plugins(tree: &sled::Tree) -> Result<LoadedPluginState> {
+        let mut plugins: PluginStore = HashMap::new();
+        let mut index: PluginIndex = HashMap::new();
         let mut max_id = 0u64;
         for item in tree.iter() {
             let entry = item.map_err(NovaError::from)?;

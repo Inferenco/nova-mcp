@@ -59,7 +59,7 @@ async fn handle_rpc(
 
     let context = match extract_context_from_headers(&headers, req.id.clone()) {
         Ok(context) => context,
-        Err(response) => return Json(response),
+        Err(response) => return Json(*response),
     };
 
     let rate_key = format!(
@@ -135,7 +135,7 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
 fn extract_context_from_headers(
     headers: &axum::http::HeaderMap,
     id: Option<serde_json::Value>,
-) -> Result<RequestContext, McpResponse> {
+) -> Result<RequestContext, Box<McpResponse>> {
     let context_type = headers
         .get("x-nova-context-type")
         .and_then(|value| value.to_str().ok())
@@ -145,11 +145,11 @@ fn extract_context_from_headers(
         Some("user") => PluginContextType::User,
         Some("group") => PluginContextType::Group,
         _ => {
-            return Err(rpc_error_response(
+            return Err(Box::new(rpc_error_response(
                 id,
                 StatusCode::BAD_REQUEST,
                 "Invalid or missing x-nova-context-type",
-            ))
+            )))
         }
     };
 
@@ -161,20 +161,20 @@ fn extract_context_from_headers(
     let context_id = match context_id_value {
         Some(ref value) if !value.is_empty() => value.clone(),
         _ => {
-            return Err(rpc_error_response(
+            return Err(Box::new(rpc_error_response(
                 id,
                 StatusCode::BAD_REQUEST,
                 "Invalid or missing x-nova-context-id",
-            ))
+            )))
         }
     };
 
     if context_id.parse::<i64>().is_err() {
-        return Err(rpc_error_response(
+        return Err(Box::new(rpc_error_response(
             id,
             StatusCode::BAD_REQUEST,
             "x-nova-context-id must be numeric",
-        ));
+        )));
     }
 
     Ok(RequestContext {
