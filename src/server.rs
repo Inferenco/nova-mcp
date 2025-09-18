@@ -1,7 +1,7 @@
 use crate::config::NovaConfig;
 use crate::error::Result;
 use crate::mcp::dto::Tool;
-use crate::plugins::PluginManager;
+use crate::plugins::{PluginManager, RequestContext};
 // Re-export MCP DTOs under `server` for backward compatibility
 pub use crate::mcp::dto::{McpError, McpRequest, McpResponse, ToolCall, ToolResult};
 use crate::tools::gecko_terminal::GeckoTerminalTools;
@@ -50,7 +50,7 @@ impl NovaServer {
         &self.new_pools_tools
     }
 
-    pub fn get_tools(&self) -> Vec<Tool> {
+    pub fn get_tools(&self, context: &RequestContext) -> Result<Vec<Tool>> {
         let mut tools = vec![];
 
         tools.push(Tool {
@@ -139,7 +139,16 @@ impl NovaServer {
             }),
         });
 
-        tools
+        let plugin_tools = self.plugin_manager.list_plugins_for_context(context)?;
+        for plugin in plugin_tools {
+            tools.push(Tool {
+                name: plugin.fq_name,
+                description: plugin.description,
+                input_schema: plugin.input_schema,
+            });
+        }
+
+        Ok(tools)
     }
 
     pub fn plugin_manager(&self) -> &PluginManager {
@@ -153,7 +162,11 @@ impl NovaServer {
     // handler logic is moved into crate::mcp::handler; keep server responsibilities focused
 
     // Backward-compatible wrapper for tests/examples
-    pub async fn handle_tool_call(&self, tool_call: ToolCall) -> Result<ToolResult> {
-        crate::mcp::handler::handle_tool_call(self, tool_call).await
+    pub async fn handle_tool_call(
+        &self,
+        tool_call: ToolCall,
+        context: &RequestContext,
+    ) -> Result<ToolResult> {
+        crate::mcp::handler::handle_tool_call(self, tool_call, context).await
     }
 }

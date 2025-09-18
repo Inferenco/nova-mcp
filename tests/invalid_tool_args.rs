@@ -15,8 +15,10 @@ async fn invalid_arguments_return_error() {
             "name": "get_gecko_networks",
             "arguments": "nope"
         })),
+        context_type: Some("user".to_string()),
+        context_id: Some("0".to_string()),
     };
-    let resp = handler::handle_request(&server, req).await;
+    let resp = handler::handle_request(&server, req, None).await;
     assert!(resp.result.is_none());
     if let Some(err) = resp.error {
         assert_eq!(err.code, -32603);
@@ -28,8 +30,11 @@ async fn invalid_arguments_return_error() {
 fn test_server() -> NovaServer {
     let config = NovaConfig::default();
     let db = sled::Config::new().temporary(true).open().unwrap();
+    let metadata_tree = db.open_tree("plugin_metadata").unwrap();
     let user_tree = db.open_tree("user_plugins").unwrap();
     let group_tree = db.open_tree("group_plugins").unwrap();
-    let plugin_manager = Arc::new(PluginManager::new(user_tree, group_tree));
+    let plugin_manager = Arc::new(
+        PluginManager::new(metadata_tree, user_tree, group_tree).expect("init plugin manager"),
+    );
     NovaServer::new(config, plugin_manager)
 }

@@ -4,7 +4,7 @@ use nova_mcp::mcp::{
     dto::{McpError, McpRequest, McpResponse},
     handler,
 };
-use nova_mcp::plugins::PluginManager;
+use nova_mcp::plugins::{PluginContextType, PluginManager, RequestContext};
 use nova_mcp::{NovaConfig, NovaServer};
 use std::sync::Arc;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -37,19 +37,27 @@ async fn main() -> Result<()> {
     );
 
     let sled_db = sled::open("nova_mcp_db").context("failed to open sled database")?;
+    let metadata_tree = sled_db
+        .open_tree("plugin_metadata")
+        .context("failed to open plugin_metadata tree")?;
     let user_tree = sled_db
         .open_tree("user_plugins")
         .context("failed to open user_plugins tree")?;
     let group_tree = sled_db
         .open_tree("group_plugins")
         .context("failed to open group_plugins tree")?;
-    let plugin_manager = Arc::new(PluginManager::new(user_tree, group_tree));
+    let plugin_manager = Arc::new(PluginManager::new(metadata_tree, user_tree, group_tree)?);
 
     // Create server instance
     let server = NovaServer::new(config.clone(), Arc::clone(&plugin_manager));
 
-    tracing::info!("Available tools: {}", server.get_tools().len());
-    for tool in server.get_tools() {
+    let bootstrap_context = RequestContext {
+        context_type: PluginContextType::User,
+        context_id: "0".to_string(),
+    };
+    let tools = server.get_tools(&bootstrap_context)?;
+    tracing::info!("Available tools: {}", tools.len());
+    for tool in tools {
         tracing::info!("  - {}: {}", tool.name, tool.description);
     }
 
@@ -85,7 +93,8 @@ async fn main() -> Result<()> {
 
                         match serde_json::from_str::<McpRequest>(line) {
                             Ok(request) => {
-                                let response = handler::handle_request(&server, request).await;
+                                let response =
+                                    handler::handle_request(&server, request, None).await;
                                 let response_json = serde_json::to_string(&response)?;
 
                                 tracing::debug!("Sending: {}", response_json);
