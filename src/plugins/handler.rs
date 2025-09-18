@@ -9,7 +9,7 @@ use crate::http::AppState;
 
 use super::dto::{
     ErrorResponse, PluginEnableRequest, PluginEnablementStatus, PluginInvocationRequest,
-    PluginMetadata, PluginRegistrationRequest, PluginUpdateRequest,
+    PluginMetadata, PluginRegistrationRequest, PluginUpdateRequest, RequestContext,
 };
 use super::helpers::{authorize_request, map_error};
 
@@ -18,8 +18,8 @@ pub(crate) async fn register_plugin(
     headers: HeaderMap,
     Json(request): Json<PluginRegistrationRequest>,
 ) -> Result<(StatusCode, Json<PluginMetadata>), (StatusCode, Json<ErrorResponse>)> {
-    let _ = authorize_request(&state, &headers).await?;
-    match state.plugin_manager().register_plugin(request) {
+    let context = authorize_request(&state, &headers).await?;
+    match state.plugin_manager().register_plugin(&context, request) {
         Ok(metadata) => Ok((StatusCode::CREATED, Json(metadata))),
         Err(err) => Err(map_error(err)),
     }
@@ -30,8 +30,11 @@ pub(crate) async fn unregister_plugin(
     headers: HeaderMap,
     Path(plugin_id): Path<u64>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
-    let _ = authorize_request(&state, &headers).await?;
-    match state.plugin_manager().unregister_plugin(plugin_id) {
+    let context = authorize_request(&state, &headers).await?;
+    match state
+        .plugin_manager()
+        .unregister_plugin(&context, plugin_id)
+    {
         Ok(()) => Ok(StatusCode::NO_CONTENT),
         Err(err) => Err(map_error(err)),
     }
@@ -43,8 +46,11 @@ pub(crate) async fn update_plugin(
     Path(plugin_id): Path<u64>,
     Json(request): Json<PluginUpdateRequest>,
 ) -> Result<Json<PluginMetadata>, (StatusCode, Json<ErrorResponse>)> {
-    let _ = authorize_request(&state, &headers).await?;
-    match state.plugin_manager().update_plugin(plugin_id, request) {
+    let context = authorize_request(&state, &headers).await?;
+    match state
+        .plugin_manager()
+        .update_plugin(&context, plugin_id, request)
+    {
         Ok(metadata) => Ok(Json(metadata)),
         Err(err) => Err(map_error(err)),
     }
@@ -54,8 +60,8 @@ pub(crate) async fn list_plugins(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<PluginMetadata>>, (StatusCode, Json<ErrorResponse>)> {
-    let _ = authorize_request(&state, &headers).await?;
-    match state.plugin_manager().list_plugins() {
+    let context = authorize_request(&state, &headers).await?;
+    match state.plugin_manager().list_plugins_for_context(&context) {
         Ok(list) => Ok(Json(list)),
         Err(err) => Err(map_error(err)),
     }
@@ -67,10 +73,16 @@ pub(crate) async fn invoke_plugin(
     Path(plugin_id): Path<u64>,
     Json(request): Json<PluginInvocationRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
-    let _ = authorize_request(&state, &headers).await?;
+    let context = authorize_request(&state, &headers).await?;
     let manager = state.plugin_manager_arc();
-    match manager.invoke_plugin(plugin_id, request).await {
-        Ok(value) => Ok(Json(value)),
+    match manager.get_plugin(plugin_id) {
+        Ok(metadata) => match manager
+            .invoke_plugin(&metadata, &context, request.arguments)
+            .await
+        {
+            Ok(value) => Ok(Json(value)),
+            Err(err) => Err(map_error(err)),
+        },
         Err(err) => Err(map_error(err)),
     }
 }
@@ -80,7 +92,7 @@ pub(crate) async fn set_plugin_enablement(
     headers: HeaderMap,
     Json(request): Json<PluginEnableRequest>,
 ) -> Result<Json<PluginEnablementStatus>, (StatusCode, Json<ErrorResponse>)> {
-    let _ = authorize_request(&state, &headers).await?;
+    let _context: RequestContext = authorize_request(&state, &headers).await?;
     match state.plugin_manager().set_enablement(request) {
         Ok(status) => Ok(Json(status)),
         Err(err) => Err(map_error(err)),

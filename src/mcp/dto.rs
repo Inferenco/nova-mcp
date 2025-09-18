@@ -26,6 +26,10 @@ pub struct McpRequest {
     pub id: Option<Value>,
     pub method: String,
     pub params: Option<Value>,
+    #[serde(default)]
+    pub context_type: Option<String>,
+    #[serde(default)]
+    pub context_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

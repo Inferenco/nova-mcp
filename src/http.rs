@@ -1,5 +1,5 @@
-use crate::mcp::dto::{McpRequest, McpResponse};
-use crate::plugins::{self, PluginManager};
+use crate::mcp::dto::{McpError, McpRequest, McpResponse};
+use crate::plugins::{self, PluginContextType, PluginManager, RequestContext};
 use crate::{ApiKeyAuth, NovaConfig, NovaServer};
 use anyhow::Result;
 use axum::{
@@ -53,35 +53,31 @@ async fn handle_rpc(
         .get(header_name.as_str())
         .and_then(|v| v.to_str().ok());
     if !state.auth().validate(presented) {
-        let res = McpResponse {
-            jsonrpc: "2.0".to_string(),
-            id: None,
-            result: None,
-            error: Some(crate::mcp::dto::McpError {
-                code: StatusCode::UNAUTHORIZED.as_u16() as i32,
-                message: "Unauthorized".to_string(),
-                data: None,
-            }),
-        };
+        let res = rpc_error_response(None, StatusCode::UNAUTHORIZED, "Unauthorized");
         return Json(res);
     }
-    // Simple per-key rate limiting
-    let key = presented.unwrap_or("anonymous").to_string();
-    if let Some(code) = check_rate_limit(&state, &key).await {
-        let res = McpResponse {
-            jsonrpc: "2.0".to_string(),
-            id: None,
-            result: None,
-            error: Some(crate::mcp::dto::McpError {
-                code: code.as_u16() as i32,
-                message: "Rate limit exceeded".to_string(),
-                data: None,
-            }),
-        };
+
+    let context = match extract_context_from_headers(&headers, req.id.clone()) {
+        Ok(context) => context,
+        Err(response) => return Json(*response),
+    };
+
+    let rate_key = format!(
+        "{}:{}",
+        match context.context_type {
+            PluginContextType::User => "user",
+            PluginContextType::Group => "group",
+        },
+        context.context_id
+    );
+
+    if let Some(code) = check_rate_limit(&state, &rate_key).await {
+        let res = rpc_error_response(req.id.clone(), code, "Rate limit exceeded");
         return Json(res);
     }
+
     let server = state.server();
-    let res = crate::mcp::handler::handle_request(server.as_ref(), req).await;
+    let res = crate::mcp::handler::handle_request(server.as_ref(), req, Some(context)).await;
     Json(res)
 }
 
@@ -116,6 +112,14 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
         .route("/plugins", get(plugins::list_plugins))
         .route("/plugins/:plugin_id/call", post(plugins::invoke_plugin))
         .route("/plugins/enable", post(plugins::set_plugin_enablement))
+        .route("/tools/register", post(plugins::register_plugin))
+        .route(
+            "/tools/:plugin_id",
+            delete(plugins::unregister_plugin).put(plugins::update_plugin),
+        )
+        .route("/tools", get(plugins::list_plugins))
+        .route("/tools/:plugin_id/call", post(plugins::invoke_plugin))
+        .route("/tools/enable", post(plugins::set_plugin_enablement))
         .layer(DefaultBodyLimit::max(1024 * 1024))
         .with_state(state);
 
@@ -126,6 +130,74 @@ pub async fn run_http_server(server: NovaServer, config: NovaConfig) -> Result<(
         tracing::error!("HTTP server error: {}", e);
     }
     Ok(())
+}
+
+fn extract_context_from_headers(
+    headers: &axum::http::HeaderMap,
+    id: Option<serde_json::Value>,
+) -> Result<RequestContext, Box<McpResponse>> {
+    let context_type = headers
+        .get("x-nova-context-type")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.trim().to_lowercase());
+
+    let context_type = match context_type.as_deref() {
+        Some("user") => PluginContextType::User,
+        Some("group") => PluginContextType::Group,
+        _ => {
+            return Err(Box::new(rpc_error_response(
+                id,
+                StatusCode::BAD_REQUEST,
+                "Invalid or missing x-nova-context-type",
+            )))
+        }
+    };
+
+    let context_id_value = headers
+        .get("x-nova-context-id")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.trim().to_string());
+
+    let context_id = match context_id_value {
+        Some(ref value) if !value.is_empty() => value.clone(),
+        _ => {
+            return Err(Box::new(rpc_error_response(
+                id,
+                StatusCode::BAD_REQUEST,
+                "Invalid or missing x-nova-context-id",
+            )))
+        }
+    };
+
+    if context_id.parse::<i64>().is_err() {
+        return Err(Box::new(rpc_error_response(
+            id,
+            StatusCode::BAD_REQUEST,
+            "x-nova-context-id must be numeric",
+        )));
+    }
+
+    Ok(RequestContext {
+        context_type,
+        context_id,
+    })
+}
+
+fn rpc_error_response(
+    id: Option<serde_json::Value>,
+    status: StatusCode,
+    message: impl Into<String>,
+) -> McpResponse {
+    McpResponse {
+        jsonrpc: "2.0".to_string(),
+        id,
+        result: None,
+        error: Some(McpError {
+            code: status.as_u16() as i32,
+            message: message.into(),
+            data: None,
+        }),
+    }
 }
 
 #[derive(Clone, Debug)]

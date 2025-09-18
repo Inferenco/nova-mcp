@@ -1,3 +1,4 @@
+use crate::plugins::{PluginContextType, RequestContext};
 use crate::server::NovaServer;
 use crate::{
     error::NovaError,
@@ -9,48 +10,63 @@ use crate::{
     tools::search_pools::{search_pools, SearchPoolsInput},
     tools::trending_pools::{get_trending_pools, GetTrendingPoolsInput},
 };
+use axum::http::StatusCode;
 use serde_json::json;
 
 use super::dto::{McpError, McpRequest, McpResponse, ToolCall, ToolResult};
 
-pub async fn handle_request(server: &NovaServer, request: McpRequest) -> McpResponse {
+pub async fn handle_request(
+    server: &NovaServer,
+    request: McpRequest,
+    transport_context: Option<RequestContext>,
+) -> McpResponse {
     match request.method.as_str() {
-        "tools/list" => {
-            let tools = server.get_tools();
-            McpResponse {
-                jsonrpc: "2.0".to_string(),
-                id: request.id,
-                result: Some(json!({
-                    "tools": tools
-                })),
-                error: None,
-            }
-        }
+        "tools/list" => match resolve_context(&request, transport_context) {
+            Ok(context) => match server.get_tools(&context) {
+                Ok(tools) => McpResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id: request.id,
+                    result: Some(json!({
+                        "tools": tools
+                    })),
+                    error: None,
+                },
+                Err(err) => error_response(
+                    request.id,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to load tools: {}", err),
+                ),
+            },
+            Err(response) => *response,
+        },
         "tools/call" => {
-            if let Some(params) = request.params {
+            if let Some(params) = request.params.clone() {
                 if let Ok(tool_call) = serde_json::from_value::<ToolCall>(params) {
-                    match handle_tool_call(server, tool_call).await {
-                        Ok(result) => McpResponse {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: Some(json!({
-                                "content": [
-                                    { "type": "text", "text": result.content }
-                                ],
-                                "isError": result.is_error
-                            })),
-                            error: None,
+                    match resolve_context(&request, transport_context.clone()) {
+                        Ok(context) => match handle_tool_call(server, tool_call, &context).await {
+                            Ok(result) => McpResponse {
+                                jsonrpc: "2.0".to_string(),
+                                id: request.id,
+                                result: Some(json!({
+                                    "content": [
+                                        { "type": "text", "text": result.content }
+                                    ],
+                                    "isError": result.is_error
+                                })),
+                                error: None,
+                            },
+                            Err(e) => McpResponse {
+                                jsonrpc: "2.0".to_string(),
+                                id: request.id,
+                                result: None,
+                                error: Some(McpError {
+                                    code: -32603,
+                                    message: format!("Tool execution failed: {}", e),
+                                    data: None,
+                                }),
+                            },
                         },
-                        Err(e) => McpResponse {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id,
-                            result: None,
-                            error: Some(McpError {
-                                code: -32603,
-                                message: format!("Tool execution failed: {}", e),
-                                data: None,
-                            }),
-                        },
+                        Err(response) => *response,
                     }
                 } else {
                     McpResponse {
@@ -109,6 +125,7 @@ pub async fn handle_request(server: &NovaServer, request: McpRequest) -> McpResp
 pub(crate) async fn handle_tool_call(
     server: &NovaServer,
     tool_call: ToolCall,
+    context: &RequestContext,
 ) -> Result<ToolResult, NovaError> {
     tracing::info!("Handling tool call: {}", tool_call.name);
     let result = match tool_call.name.as_str() {
@@ -176,10 +193,25 @@ pub(crate) async fn handle_tool_call(
             serde_json::to_value(output)?
         }
         _ => {
-            return Err(NovaError::api_error(format!(
-                "Unknown tool: {}",
-                tool_call.name
-            )));
+            let (expected_type, expected_id, _base, _version) =
+                parse_fully_qualified_name(&tool_call.name)
+                    .ok_or_else(|| NovaError::api_error("Invalid tool name"))?;
+
+            let metadata = server
+                .plugin_manager()
+                .get_plugin_by_fq_name(&tool_call.name)?;
+
+            if metadata.context_type != expected_type || metadata.context_id != expected_id {
+                return Err(NovaError::api_error(
+                    "Tool context does not match registered owner",
+                ));
+            }
+
+            let response = server
+                .plugin_manager()
+                .invoke_plugin(&metadata, context, tool_call.arguments)
+                .await?;
+            response
         }
     };
 
@@ -187,4 +219,95 @@ pub(crate) async fn handle_tool_call(
         content: serde_json::to_string_pretty(&result)?,
         is_error: false,
     })
+}
+
+fn resolve_context(
+    request: &McpRequest,
+    transport_context: Option<RequestContext>,
+) -> Result<RequestContext, Box<McpResponse>> {
+    if let Some(context) = transport_context {
+        return Ok(context);
+    }
+
+    let context_type = request
+        .context_type
+        .as_ref()
+        .map(|value| value.trim().to_lowercase());
+    let context_id = request
+        .context_id
+        .as_ref()
+        .map(|value| value.trim().to_string());
+
+    let context_type = match context_type.as_deref() {
+        Some("user") => PluginContextType::User,
+        Some("group") => PluginContextType::Group,
+        _ => {
+            return Err(Box::new(error_response(
+                request.id.clone(),
+                StatusCode::UNAUTHORIZED,
+                "Missing or invalid context_type",
+            )))
+        }
+    };
+
+    let context_id = match context_id {
+        Some(id) if !id.is_empty() => id,
+        _ => {
+            return Err(Box::new(error_response(
+                request.id.clone(),
+                StatusCode::UNAUTHORIZED,
+                "Missing or invalid context_id",
+            )))
+        }
+    };
+
+    if context_id.parse::<i64>().is_err() {
+        return Err(Box::new(error_response(
+            request.id.clone(),
+            StatusCode::UNAUTHORIZED,
+            "context_id must be numeric",
+        )));
+    }
+
+    Ok(RequestContext {
+        context_type,
+        context_id,
+    })
+}
+
+fn parse_fully_qualified_name(name: &str) -> Option<(PluginContextType, String, String, u32)> {
+    if let Some(stripped) = name.strip_prefix("user_") {
+        parse_name_parts(stripped)
+            .map(|(context_id, base, version)| (PluginContextType::User, context_id, base, version))
+    } else if let Some(stripped) = name.strip_prefix("group_") {
+        parse_name_parts(stripped).map(|(context_id, base, version)| {
+            (PluginContextType::Group, context_id, base, version)
+        })
+    } else {
+        None
+    }
+}
+
+fn parse_name_parts(input: &str) -> Option<(String, String, u32)> {
+    let (context_id, remainder) = input.split_once('_')?;
+    let (base, version_part) = remainder.rsplit_once("_v")?;
+    let version = version_part.parse::<u32>().ok()?;
+    Some((context_id.to_string(), base.to_string(), version))
+}
+
+fn error_response(
+    id: Option<serde_json::Value>,
+    status: StatusCode,
+    message: impl Into<String>,
+) -> McpResponse {
+    McpResponse {
+        jsonrpc: "2.0".to_string(),
+        id,
+        result: None,
+        error: Some(McpError {
+            code: status.as_u16() as i32,
+            message: message.into(),
+            data: None,
+        }),
+    }
 }
